@@ -1,0 +1,212 @@
+"""
+数据发送处理模块
+"""
+from datetime import datetime
+from PyQt5.QtCore import QObject, pyqtSignal, QThread, QTimer
+from PyQt5.QtWidgets import QTextEdit
+from serial import SerialException
+from utils.logger import Logger
+from typing import Optional
+
+class SendWorker(QThread):
+    """数据发送工作线程"""
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.serial_port = None
+        self.data = None
+
+    def set_data(self, serial_port, data):
+        """设置发送数据"""
+        self.serial_port = serial_port
+        self.data = data
+
+    def run(self):
+        try:
+            if not self.serial_port:
+                self.error.emit("串口对象为空")
+                return
+
+            if not self.serial_port.is_open:
+                self.error.emit("串口未打开")
+                return
+
+            # 添加发送状态检查
+            if hasattr(self.serial_port, '_is_sending') and self.serial_port._is_sending:
+                self.error.emit("串口正在发送数据")
+                return
+            
+            self.serial_port._is_sending = True
+            self.serial_port.write(self.data)
+            self.serial_port._is_sending = False
+            
+            self.finished.emit()
+
+        except SerialException as e:
+            self.error.emit(f"串口错误: {str(e)}")
+            if hasattr(self.serial_port, '_is_sending'):
+                self.serial_port._is_sending = False
+        except Exception as e:
+            self.error.emit(f"发送失败: {str(e)}")
+            if hasattr(self.serial_port, '_is_sending'):
+                self.serial_port._is_sending = False
+
+
+class DataSender(QObject):
+    # 定义信号
+    data_sent = pyqtSignal(int)  # 数据发送成功信号
+    send_failed = pyqtSignal(str)  # 发送失败信号
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.send_edit = None
+        self.recv_text = None
+        self.serial_manager = None
+        self.log_manager = None
+        self.hex_send = False
+        self.add_crlf = False
+        self.total_send_bytes = 0
+        self.show_timestamp = False
+
+        # 定时发送相关
+        self.is_timer_sending = False
+        self.timer_send = QTimer(self)
+        self.timer_send.timeout.connect(self._on_timer_send)
+
+    def set_send_edit(self, edit: QTextEdit) -> None:
+        """设置发送文本框"""
+        self.send_edit = edit
+
+    def set_recv_text(self, text_edit: QTextEdit) -> None:
+        """设置接收文本框"""
+        self.recv_text = text_edit
+
+    def set_serial_manager(self, manager) -> None:
+        """设置串口管理器"""
+        self.serial_manager = manager
+
+    def clear_data(self) -> None:
+        """清空发送数据"""
+        if self.send_edit:
+            self.send_edit.clear()
+
+    def start_timer_send(self, interval: int) -> None:
+        """启动定时发送
+
+        Args:
+            interval: 发送间隔(毫秒)
+        """
+        self.is_timer_sending = True
+        self.timer_send.start(interval)
+        Logger.log(f"启动定时发送，间隔: {interval}ms", "INFO")
+
+    def stop_timer_send(self) -> None:
+        """停止定时发送"""
+        self.is_timer_sending = False
+        self.timer_send.stop()
+        Logger.log("停止定时发送", "INFO")
+
+    def _on_timer_send(self) -> None:
+        """定时发送超时处理"""
+        if self.is_timer_sending:
+            self.send_data()
+
+    def send_data(self) -> None:
+        """发送数据"""
+        if not self.serial_manager or not self.serial_manager.is_connected:
+            return
+        try:
+            # 获取发送数据
+            data = self._get_send_data()
+            if not data:
+                return
+
+            # 发送数据
+            success = self.serial_manager.write(data)
+
+            if success:
+                # 记录发送日志
+                display_data = data.decode('utf-8', errors='ignore')
+                if self.hex_send:
+                    display_data = data.hex(' ').upper()
+
+                # 显示发送数据
+                self._display_sent_data(display_data)
+
+                # 记录日志
+                if self.log_manager:
+                    self.log_manager.write_sent_log(display_data)
+
+        except Exception as e:
+            Logger.log(f"发送数据失败: {str(e)}", "ERROR")
+            self.send_failed.emit(str(e))
+
+    def _display_sent_data(self, data: str) -> None:
+        """显示发送的数据"""
+        if not self.recv_text:
+            return
+
+        display_data = data
+
+        # 根据show_timestamp决定是否添加时间戳
+        if self.show_timestamp:
+            timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            # 使用蓝色显示发送数据
+            display_data = f'<span style="color: #409EFF; font-family: SimSun; font-size: 9pt;">[{timestamp}]发送{display_data}</span>'
+        else:
+            # 不显示时间戳
+            display_data = f'<span style="color: #409EFF; font-family: SimSun; font-size: 9pt;">{display_data}</span>'
+
+        # 添加到接收框
+        self.recv_text.append(display_data)
+
+    def _on_send_success(self, bytes_count):
+        """发送成功处理"""
+        self.total_send_bytes += bytes_count
+        self.data_sent.emit(bytes_count)
+        Logger.log(f"发送数据 ({bytes_count} 字节)", "INFO")
+
+    def _get_send_data(self) -> Optional[bytes]:
+        """获取要发送的数据
+
+        Returns:
+            bytes: 要发送的字节数据，如果获取失败返回None
+        """
+        if not self.send_edit:
+            return None
+
+        # 获取发送文本
+        text = self.send_edit.toPlainText().strip()
+        if not text:
+            return None
+
+        try:
+            # 处理十六进制发送
+            if self.hex_send:
+                data = bytes.fromhex(text.replace(' ', ''))
+            else:
+                data = text.encode('utf-8', errors='ignore')
+
+            # 添加回车换行
+            if self.add_crlf:
+                data += b'\r\n'
+
+            return data
+        except ValueError as e:
+            Logger.log(f"十六进制数据格式错误: {str(e)}", "ERROR")
+            self.send_failed.emit("十六进制数据格式错误")
+            return None
+        except Exception as e:
+            Logger.log(f"获取发送数据失败: {str(e)}", "ERROR")
+            self.send_failed.emit(str(e))
+            return None
+
+    def set_log_manager(self, log_manager) -> None:
+        """设置日志管理器
+
+        Args:
+            log_manager: LogManager实例
+        """
+        self.log_manager = log_manager
