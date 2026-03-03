@@ -343,3 +343,15 @@ class SerialDebugTabEvents:
 
         if file_path:
             self.tab.command_manager.export_commands(file_path)
+
+    def on_save_log(self):
+        """保存日志"""
+        self.tab.save_log()
+
+    def on_open_file(self):
+        """打开文件"""
+        self.tab.send_file()
+
+    def on_refresh_ports(self):
+        """刷新串口列表"""
+        self.tab.parent.refresh_ports()

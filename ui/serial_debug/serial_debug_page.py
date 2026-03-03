@@ -1175,6 +1175,35 @@ class SerialDebugTab(QWidget):
             cursor.setPosition(min(cursor_pos, len(filtered_text)))
             self.send_edit.setTextCursor(cursor)
 
+    def keyPressEvent(self, event):
+        """处理键盘快捷键事件"""
+        modifiers = event.modifiers()
+        key = event.key()
+
+        # Ctrl+Enter: 发送数据
+        if modifiers == Qt.ControlModifier and key == Qt.Key_Return:
+            self.events.on_send_data()
+
+        # Ctrl+L: 清空接收区
+        elif modifiers == Qt.ControlModifier and key == Qt.Key_L:
+            self.events.on_clear_recv()
+
+        # Ctrl+S: 保存日志
+        elif modifiers == Qt.ControlModifier and key == Qt.Key_S:
+            self.events.on_save_log()
+
+        # Ctrl+O: 打开文件
+        elif modifiers == Qt.ControlModifier and key == Qt.Key_O:
+            self.events.on_open_file()
+
+        # Ctrl+R: 刷新串口列表
+        elif modifiers == Qt.ControlModifier and key == Qt.Key_R:
+            self.events.on_refresh_ports()
+
+        # 其他按键交给父类处理
+        else:
+            super().keyPressEvent(event)
+
 
 class SerialDebugCoordinator(QObject):
     """串口调试协调器，负责各模块间的通信协调"""
