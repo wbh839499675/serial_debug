@@ -13,9 +13,8 @@ from PyQt5.QtWidgets import (
     QFormLayout, QGraphicsDropShadowEffect
 )
 from PyQt5.QtCore import Qt, QTimer, QDateTime, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QColor, QBrush, QMovie
+from PyQt5.QtGui import QFont, QColor, QBrush, QMovie, QTextCursor, QTextCharFormat
 from datetime import datetime
-from PyQt5.QtGui import QTextCursor
 
 from utils.constants import get_dialog_style
 from utils.constants import get_custom_dialog_style
@@ -1023,217 +1022,254 @@ class CustomMessageBox(QDialog):
 class LogSearchDialog(QDialog):
     """日志搜索对话框"""
 
-    # 添加搜索信号
-    search_requested = pyqtSignal(str, bool, bool, bool)  # 搜索文本, 区分大小写, 正则表达式, 全词匹配
+    search_requested = pyqtSignal(str, bool, bool, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("日志搜索")
-        self.setFixedSize(500, 200)
-
-        # 初始化UI
-        self.init_ui()
-
-        # 连接信号
-        self._connect_signals()
-
-        # 搜索结果列表
+        self.setWindowTitle("搜索日志")
+        self.setFixedSize(600, 400)
+        self.parent_page = parent
         self.search_results = []
-        self.current_match_index = -1
+        self.current_match_index = 0
+        self.search_start_position = 0
+        self.init_ui()
 
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
 
-        # 搜索框布局
-        options_layout = QHBoxLayout()
+        # 搜索框
+        search_layout = QHBoxLayout()
         search_label = QLabel("🔍 搜索:")
-        search_label.setStyleSheet("font-weight: bold;")
-        options_layout.addWidget(search_label)
+        search_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
+        search_layout.addWidget(search_label)
 
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("输入搜索关键词...")
+        self.search_edit.setPlaceholderText("输入要搜索的内容...")
         self.search_edit.setMinimumHeight(32)
-        options_layout.addWidget(self.search_edit, 1)
+        search_layout.addWidget(self.search_edit, 1)
 
+        self.search_btn = QPushButton("搜索")
+        self.search_btn.setMinimumWidth(80)
+        self.search_btn.clicked.connect(self.on_search)
+        search_layout.addWidget(self.search_btn)
+
+        layout.addLayout(search_layout)
+
+        # 搜索选项
+        options_layout = QHBoxLayout()
         self.case_sensitive_check = QCheckBox("区分大小写")
-        options_layout .addWidget(self.case_sensitive_check)
+        self.use_regex_check = QCheckBox("使用正则表达式")
+        self.whole_word_check = QCheckBox("全字匹配")
 
-        self.regex_check = QCheckBox("正则表达式")
-        options_layout.addWidget(self.regex_check)
-
-        self.whole_word_check = QCheckBox("全词匹配")
-        options_layout .addWidget(self.whole_word_check)
+        options_layout.addWidget(self.case_sensitive_check)
+        options_layout.addWidget(self.use_regex_check)
+        options_layout.addWidget(self.whole_word_check)
+        options_layout.addStretch()
 
         layout.addLayout(options_layout)
 
-        # 添加搜索按钮
-        self.search_btn = QPushButton("搜索")
-        self.search_btn.clicked.connect(self._on_search)
-        layout.addWidget(self.search_btn)
+        # 匹配行内容显示区域
+        #self.match_content_label = QLabel("匹配行内容:")
+        #self.match_content_label.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        #layout.addWidget(self.match_content_label)
+
+        # 使用QTableWidget显示匹配行内容，支持多行显示和行号
+        self.match_content_table = QTableWidget()
+        self.match_content_table.setColumnCount(2)
+        self.match_content_table.setHorizontalHeaderLabels(["行号", "内容"])
+        self.match_content_table.horizontalHeader().setStretchLastSection(True)
+        self.match_content_table.setColumnWidth(0, 60)  # 设置行号列宽度
+        self.match_content_table.verticalHeader().setVisible(False)  # 隐藏垂直表头
+        self.match_content_table.setEditTriggers(QTableWidget.NoEditTriggers)  # 禁止编辑
+        self.match_content_table.setSelectionBehavior(QTableWidget.SelectRows)  # 整行选择
+        self.match_content_table.setSelectionMode(QTableWidget.SingleSelection)  # 单选模式
+        self.match_content_table.setAlternatingRowColors(True)  # 交替行颜色
+        self.match_content_table.setStyleSheet("""
+            QTableWidget {
+                background-color: #f5f7fa;
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+                gridline-color: #ebeef5;
+                font-family: Consolas, Monaco, 'Andale Mono', monospace;
+                font-size: 9pt;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QTableWidget::item:selected {
+                background-color: #409eff;
+                color: white;
+            }
+            QHeaderView::section {
+                background-color: #f5f7fa;
+                color: #606266;
+                padding: 5px;
+                border: none;
+                border-bottom: 1px solid #dcdfe6;
+                font-weight: bold;
+            }
+        """)
+        layout.addWidget(self.match_content_table)
 
         # 导航按钮
         nav_layout = QHBoxLayout()
+        nav_layout.addStretch()
 
-        self.prev_btn = QPushButton("上一个")
-        self.prev_btn.setEnabled(True)
-        nav_layout.addWidget(self.prev_btn)
+        # 创建按钮容器
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setSpacing(5)  # 设置按钮间距
+        button_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.next_btn = QPushButton("下一个")
-        self.next_btn.setEnabled(True)
-        nav_layout.addWidget(self.next_btn)
+        # 添加导航按钮
+        self.prev_btn = QPushButton("◀ 上一个")
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.clicked.connect(self.on_prev_match)
+        button_layout.addWidget(self.prev_btn)
 
+        self.next_btn = QPushButton("下一个 ▶")
+        self.next_btn.setEnabled(False)
+        self.next_btn.clicked.connect(self.on_next_match)
+        button_layout.addWidget(self.next_btn)
+
+        # 将按钮容器添加到导航布局
+        nav_layout.addWidget(button_container)
         layout.addLayout(nav_layout)
 
-        # 搜索结果标签
-        self.result_label = QLabel("未找到匹配项")
-        layout.addWidget(self.result_label)
+        # 设置样式
+        self.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                background-color: #409eff;
+                color: white;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #66b1ff;
+            }
+            QPushButton:disabled {
+                background-color: #c0c4cc;
+                color: #ffffff;
+            }
+            QLineEdit {
+                padding: 6px 10px;
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+            }
+        """)
 
-    def _connect_signals(self):
-        """连接信号槽"""
-        # 确保search_btn已存在
-        if hasattr(self, 'search_btn'):
-            self.search_btn.clicked.connect(self._on_search)
-        else:
-            # 如果search_btn不存在，创建它
-            self.search_btn = QPushButton("搜索")
-            self.search_btn.clicked.connect(self._on_search)
+        # 连接回车键到搜索
+        self.search_edit.returnPressed.connect(self.on_search)
 
-        self.next_btn.clicked.connect(self._on_next)
-        self.prev_btn.clicked.connect(self._on_prev)
-        self.search_edit.returnPressed.connect(self._on_search)
-
-    def _on_search(self):
+    def on_search(self):
         """执行搜索"""
         text = self.search_edit.text()
         if not text:
-            Logger.log("搜索文本为空，跳过搜索", "DEBUG")
             return
 
-        Logger.log(f"开始搜索: {text}", "DEBUG")
-
-        # 获取搜索选项
         case_sensitive = self.case_sensitive_check.isChecked()
-        use_regex = self.regex_check.isChecked()
+        use_regex = self.use_regex_check.isChecked()
         whole_word = self.whole_word_check.isChecked()
 
-        Logger.log(f"搜索选项 - 区分大小写: {case_sensitive}, 正则表达式: {use_regex}, 全词匹配: {whole_word}", "DEBUG")
-
-        # 发出搜索信号
+        # 发射搜索信号
         self.search_requested.emit(text, case_sensitive, use_regex, whole_word)
-        Logger.log("已发出搜索信号", "DEBUG")
-
-    def _on_next(self):
-        """查找下一个"""
-        Logger.log(f"点击下一个按钮，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
-
-        if not self.search_results:
-            Logger.log("没有搜索结果，无法跳转", "WARNING")
-            return
-
-        self.current_match_index = (self.current_match_index + 1) % len(self.search_results)
-        Logger.log(f"跳转到索引: {self.current_match_index}", "DEBUG")
-
-        self._highlight_current_match()
-        self.prev_btn.setEnabled(True)
-
-    def _on_prev(self):
-        """查找上一个"""
-        Logger.log(f"点击上一个按钮，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
-
-        if not self.search_results:
-            Logger.log("没有搜索结果，无法跳转", "WARNING")
-            return
-
-        self.current_match_index = (self.current_match_index - 1) % len(self.search_results)
-        Logger.log(f"跳转到索引: {self.current_match_index}", "DEBUG")
-
-        self._highlight_current_match()
-        self.next_btn.setEnabled(True)
 
     def on_prev_match(self):
-        """跳转到上一个匹配项"""
-        if not self.current_matches:
-            return
-
-        if self.current_index <= 0:
-            self.current_index = len(self.current_matches) - 1
-        else:
-            self.current_index -= 1
-
-        self.highlight_match()
-        self.update_status()
+        """导航到上一个匹配项"""
+        if self.current_match_index > 0:
+            self.current_match_index -= 1
+            self._highlight_current_match()
 
     def on_next_match(self):
-        """跳转到下一个匹配项"""
-        if not self.current_matches:
-            return
-
-        if self.current_index >= len(self.current_matches) - 1:
-            self.current_index = 0
-        else:
-            self.current_index += 1
-
-        self.highlight_match()
-        self.update_status()
+        """导航到下一个匹配项"""
+        if self.current_match_index < len(self.search_results) - 1:
+            self.current_match_index += 1
+            self._highlight_current_match()
 
     def _highlight_current_match(self):
-        """高亮当前匹配项"""
-        Logger.log(f"高亮匹配项，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
-
-        if not self.search_results:
-            Logger.log("没有搜索结果，无法高亮", "WARNING")
+        """高亮当前匹配项并显示所在行内容"""
+        if not self.search_results or self.current_match_index >= len(self.search_results):
             return
 
-        start, end = self.search_results[self.current_match_index]
-        Logger.log(f"高亮范围: {start}-{end}", "DEBUG")
+        # 获取当前匹配项的位置
+        start_pos, end_pos = self.search_results[self.current_match_index]
 
-        # 调用父窗口的高亮方法
-        if hasattr(self.parent(), 'highlight_search_result'):
-            self.parent().highlight_search_result(
-                start, end, True, self.search_results
-            )
-            Logger.log("已调用父窗口高亮方法", "DEBUG")
-        else:
-            Logger.log("父窗口没有highlight_search_result方法", "ERROR")
+        # 高亮匹配项
+        self.parent_page.highlight_search_result(start_pos, end_pos, True, self.search_results)
 
-        # 更新结果标签
-        self.result_label.setText(
-            f"匹配 {self.current_match_index + 1}/{len(self.search_results)}"
-        )
+        # 更新按钮状态
+        self.prev_btn.setEnabled(self.current_match_index > 0)
+        self.next_btn.setEnabled(self.current_match_index < len(self.search_results) - 1)
 
-    def update_status(self):
-        """更新状态标签"""
-        if not self.current_matches:
-            self.status_label.setText("未找到匹配项")
-        else:
-            self.status_label.setText(f"找到 {len(self.current_matches)} 个匹配项，当前第 {self.current_index + 1} 个")
+        # 获取匹配项所在行的内容
+        self._display_match_line_content(start_pos)
 
-    def search(self, text: str):
-        """执行搜索
+    def _display_match_line_content(self, position):
+        """显示所有匹配项所在行的内容"""
+        # 获取文档
+        document = self.parent_page.recv_text.document()
 
-        Args:
-            text: 要搜索的文本
-        """
-        self.current_matches = []
-        self.current_index = -1
+        # 清空表格
+        self.match_content_table.setRowCount(0)
 
-        if not text:
-            self.update_status()
-            return
+        # 遍历所有匹配项
+        for i, (start_pos, end_pos) in enumerate(self.search_results):
+            # 创建光标并定位到匹配位置
+            cursor = QTextCursor(document)
+            cursor.setPosition(start_pos)
 
-        # 获取搜索参数
-        case_sensitive = self.case_sensitive_check.isChecked()
-        use_regex = self.regex_check.isChecked()
-        whole_word = self.whole_word_check.isChecked()
+            # 选择整行
+            cursor.select(QTextCursor.LineUnderCursor)
+            line_text = cursor.selectedText()
 
-        # 通知父窗口执行搜索
-        self.current_matches = self.parent().search_in_log(text, case_sensitive, use_regex, whole_word)
+            # 获取行号
+            line_number = cursor.blockNumber() + 1
 
-        # 如果有匹配项，选中第一个
-        if self.current_matches:
-            self.current_index = 0
-            self.highlight_match()
+            # 添加行到表格
+            row = self.match_content_table.rowCount()
+            self.match_content_table.insertRow(row)
 
-        self.update_status()
+            # 设置行号
+            line_number_item = QTableWidgetItem(str(line_number))
+            line_number_item.setTextAlignment(Qt.AlignCenter)
+
+            # 如果是当前匹配项，设置不同的背景色
+            if i == self.current_match_index:
+                line_number_item.setBackground(QColor(255, 165, 0))  # 橙色背景
+                line_number_item.setForeground(QColor(255, 255, 255))  # 白色文字
+
+            self.match_content_table.setItem(row, 0, line_number_item)
+
+            # 高亮匹配项在行中的位置
+            match_start_in_line = start_pos - cursor.selectionStart()
+            match_end_in_line = match_start_in_line + (end_pos - start_pos)
+
+            # 创建富文本，高亮匹配项
+            # 使用HTML格式化文本，高亮匹配部分
+            before_match = line_text[:match_start_in_line]
+            matched_text = line_text[match_start_in_line:match_end_in_line]
+            after_match = line_text[match_end_in_line:]
+
+            # 使用HTML格式化文本，高亮匹配部分
+            formatted_text = f"{before_match}<span style='background-color: #FFFF00;'>{matched_text}</span>{after_match}"
+
+            # 使用QLabel显示富文本
+            content_label = QLabel(formatted_text)
+            content_label.setTextFormat(Qt.RichText)  # 设置为富文本格式
+            content_label.setWordWrap(True)  # 启用自动换行
+
+            # 如果是当前匹配项，设置不同的背景色
+            #if i == self.current_match_index:
+            #    content_label.setStyleSheet("background-color: #FFA500; color: white; padding: 5px;")
+
+            # 将QLabel添加到表格
+            self.match_content_table.setCellWidget(row, 1, content_label)
+
+        # 滚动到当前匹配项
+        self.match_content_table.selectRow(self.current_match_index)
+        self.match_content_table.scrollToItem(self.match_content_table.item(self.current_match_index, 0))
+

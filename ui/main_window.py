@@ -36,7 +36,7 @@ from ui.device_test_page import DeviceTestPage
 from ui.gnss_page import GNSSPage
 from ui.serial_debug.serial_debug_page import SerialDebugPage
 
-from ui.camera_page import CameraDebugPage
+from ui.camera_debug.camera_debug_page import CameraDebugPage
 from ui.power_analysis_page import PowerAnalysisPage
 from ui.oscilloscope_page import OscilloscopePage
 
@@ -1357,21 +1357,31 @@ class MainWindow(QMainWindow):
             # 4. 停止所有子页面的线程
             if hasattr(self, 'camera_page') and self.camera_page:
                 try:
-                    # 停止图像解析线程
-                    if hasattr(self.camera_page, 'image_parser') and self.camera_page.image_parser:
-                        self.camera_page.image_parser.stop()
-                        if self.camera_page.image_parser.isRunning():
-                            self.camera_page.image_parser.wait(3000)
-
-                    # 停止扫码解析线程
-                    if hasattr(self.camera_page, 'scan_parser') and self.camera_page.scan_parser:
-                        self.camera_page.scan_parser.stop()
-                        if self.camera_page.scan_parser.isRunning():
-                            self.camera_page.scan_parser.wait(3000)
+                    # 标记页面正在销毁
+                    if hasattr(self.camera_page, '_is_destroying'):
+                        self.camera_page._is_destroying = True
 
                     # 停止图像采集
                     if hasattr(self.camera_page, 'is_capturing') and self.camera_page.is_capturing:
                         self.camera_page.stop_capture()
+
+                    # 停止图像解析线程
+                    if hasattr(self.camera_page, 'image_parser_thread') and self.camera_page.image_parser_thread:
+                        if self.camera_page.image_parser_thread.isRunning():
+                            self.camera_page.image_parser_thread.stop()
+                            if not self.camera_page.image_parser_thread.wait(3000):
+                                Logger.log("图像解析线程停止超时，强制终止", "WARNING", self.log_text)
+                                self.camera_page.image_parser_thread.terminate()
+                                self.camera_page.image_parser_thread.wait(1000)
+
+                    # 停止扫码解析线程
+                    if hasattr(self.camera_page, 'scan_parser_thread') and self.camera_page.scan_parser_thread:
+                        if self.camera_page.scan_parser_thread.isRunning():
+                            self.camera_page.scan_parser_thread.stop()
+                            if not self.camera_page.scan_parser_thread.wait(3000):
+                                Logger.log("扫码解析线程停止超时，强制终止", "WARNING", self.log_text)
+                                self.camera_page.scan_parser_thread.terminate()
+                                self.camera_page.scan_parser_thread.wait(1000)
 
                     # 断开串口
                     if hasattr(self.camera_page, 'is_connected') and self.camera_page.is_connected:
