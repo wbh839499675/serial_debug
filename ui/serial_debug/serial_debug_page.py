@@ -513,30 +513,24 @@ class SerialDebugTab(QWidget):
 
         recv_layout.addWidget(recv_options_widget)
 
-        # 创建接收文本框
-        """
-        self.recv_text = SerialDebugTabLayout.create_recv_text()
-        recv_layout.addWidget(self.recv_text)
-        """
         # 创建接收文本框容器
         recv_text_container = QWidget()
         recv_text_layout = QHBoxLayout(recv_text_container)
         recv_text_layout.setContentsMargins(0, 0, 0, 0)
         recv_text_layout.setSpacing(0)
 
-        # 创建接收文本框
-        self.recv_text = SerialDebugTabLayout.create_recv_text()
-        self.recv_text.setLineWrapMode(QTextEdit.NoWrap)  # 不自动换行
-
+        self.recv_text = LineNumberTextEdit(self)
+        self.recv_text.setReadOnly(True)
+        self.recv_text.setStyleSheet(get_page_text_edit_style('serial_debug', 'recv'))
         # 创建行号区域
         self.line_number_area = LineNumberArea(self.recv_text)
         # 连接信号
         self.recv_text.textChanged.connect(lambda: self.updateLineNumberAreaWidth(0))
-
+        # 行号区域与文本区域同步滚动
+        self.recv_text.updateRequest.connect(self.updateLineNumberArea)
         # 添加到布局
         recv_text_layout.addWidget(self.line_number_area)
         recv_text_layout.addWidget(self.recv_text, 1)
-
         recv_layout.addWidget(recv_text_container)
 
         # 创建统计标签
@@ -1290,18 +1284,24 @@ class SerialDebugTab(QWidget):
                     search_content = plain_text.lower()
 
                 if whole_word:
-                    # 全词匹配
-                    word_pattern = r'\b' + re.escape(text) + r'\b'
+                    # 全词匹配 - 使用更精确的匹配方式
+                    word_pattern = r'(^|\W)' + re.escape(text) + r'($|\W)'
                     flags = 0 if case_sensitive else re.IGNORECASE
                     pattern = re.compile(word_pattern, flags)
 
                     for match in pattern.finditer(plain_text):
                         start = match.start()
                         end = match.end()
+                        # 调整匹配位置，排除前后的非单词字符
+                        if match.group(1):
+                            start += len(match.group(1))
+                        if match.group(2):
+                            end -= len(match.group(2))
+
                         # 只添加起始位置之后的匹配项
                         if start >= start_position:
                             results.append((start, end))
-                            Logger.log(f"找到匹配: 位置 {start}-{end}", "DEBUG")
+
                 else:
                     # 普通搜索
                     start = max(start_position, 0)
@@ -1497,3 +1497,19 @@ class LineNumberArea(QWidget):
         if parent:
             parent.lineNumberAreaPaintEvent(event)
 
+class LineNumberTextEdit(QTextEdit):
+    """带行号功能的文本编辑框"""
+    # 定义更新请求信号
+    updateRequest = pyqtSignal(QRect, int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setLineWrapMode(QTextEdit.NoWrap)  # 不自动换行
+
+    def paintEvent(self, event):
+        """重写绘制事件，发射更新请求信号"""
+        # 调用父类的绘制事件
+        super().paintEvent(event)
+
+        # 发射更新请求信号，通知行号区域更新
+        self.updateRequest.emit(self.contentsRect(), self.verticalScrollBar().value())
