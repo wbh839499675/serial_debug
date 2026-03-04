@@ -17,7 +17,7 @@ class SatelliteInfo:
     constellation: str  # 星座类型
     used_in_fix: bool = False  # 是否用于定位
     gnss_id: str = ''  # GNSS系统ID
-    
+
     def get_color(self) -> QColor:
         """根据信噪比获取颜色"""
         if self.snr >= 40:
@@ -28,7 +28,7 @@ class SatelliteInfo:
             return QColor(255, 165, 0)  # 橙色 - 弱信号
         else:
             return QColor(255, 0, 0)  # 红色 - 信号很弱
-    
+
     def get_radius(self) -> float:
         """根据信号强度获取半径"""
         if self.snr >= 40:
@@ -42,48 +42,45 @@ class SatelliteInfo:
 
 @dataclass
 class GNSSPosition:
-    """GNSS位置信息"""
-    latitude: float = 0.0
-    longitude: float = 0.0
-    altitude: float = 0.0
-    speed: float = 0.0  # 速度 (km/h)
-    course: float = 0.0  # 航向 (度)
-    hdop: float = 0.0  # 水平精度因子
-    vdop: float = 0.0  # 垂直精度因子
-    pdop: float = 0.0  # 位置精度因子
-    fix_quality: int = 0  # 定位质量
-    fix_type: str = 'No Fix'  # 定位类型
-    satellites_used: int = 0  # 使用卫星数
-    timestamp: datetime = field(default_factory=datetime.now)
+    """GNSS位置数据模型"""
+
+    def __init__(self):
+        self.latitude = 0.0
+        self.longitude = 0.0
+        self.altitude = 0.0
+        self.speed = 0.0
+        self.course = 0.0
+        self.timestamp = None
+        self.fix_quality = 0
+        self.satellites_used = 0
 
 @dataclass
 class GNSSStatistics:
-    """GNSS统计信息"""
-    total_sentences: int = 0
-    valid_sentences: int = 0
-    fix_count: int = 0
-    total_satellites: int = 0
-    avg_snr: float = 0.0
-    avg_hdop: float = 0.0
-    start_time: datetime = field(default_factory=datetime.now)
-    last_fix_time: Optional[datetime] = None
-    
+    """GNSS统计数据模型"""
+
+    def __init__(self):
+        self.total_packets = 0
+        self.valid_packets = 0
+        self.invalid_packets = 0
+        self.position_updates = 0
+        self.satellite_updates = 0
+
     def update(self, position: 'GNSSPosition', satellites: List[SatelliteInfo]):
         """更新统计信息"""
         self.total_sentences += 1
-        
+
         if position.fix_quality > 0:
             self.valid_sentences += 1
             self.fix_count += 1
             self.last_fix_time = position.timestamp
-            
+
             # 更新平均HDOP
             if position.hdop > 0:
                 if self.avg_hdop == 0:
                     self.avg_hdop = position.hdop
                 else:
                     self.avg_hdop = (self.avg_hdop * 0.9) + (position.hdop * 0.1)
-        
+
         # 更新卫星统计
         if satellites:
             valid_satellites = [s for s in satellites if s.snr > 0]

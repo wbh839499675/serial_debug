@@ -36,8 +36,8 @@ from core.tester import SerialTester
 from ui.serial_debug.serial_debug_page import SerialDebugPage
 from ui.camera_debug.camera_debug_page import CameraDebugPage
 from ui.device_test.device_test_page import DeviceTestPage
+from ui.gnss_test.gnss_test_page import GNSSTestPage
 
-from ui.gnss_page import GNSSPage
 from ui.power_analysis_page import PowerAnalysisPage
 from ui.oscilloscope_page import OscilloscopePage
 
@@ -49,12 +49,12 @@ from ui.dialogs import CustomMessageBox
 from utils.constants import UI_NAV_ITEM_WIDTH
 
 # ====== 导航页面宏开关配置 ======
-ENABLE_SERIAL_DEBUG_PAGE = True      # 启用串口调试页面
-ENABLE_CAMERA_PAGE = True            # 启用Camera调试页面
-ENABLE_GNSS_PAGE = False             # 启用GNSS测试页面
-ENABLE_DEVICE_TEST_PAGE = True       # 启用设备测试页面
-ENABLE_POWER_ANALYSIS_PAGE = False   # 启用功耗分析页面
-ENABLE_OSCILLOSCOPE_PAGE = False     # 启用虚拟示波器页面
+ENABLE_SERIAL_DEBUG_PAGE    = True      # 启用串口调试页面
+ENABLE_CAMERA_PAGE          = True      # 启用Camera调试页面
+ENABLE_GNSS_PAGE            = True      # 启用GNSS测试页面
+ENABLE_DEVICE_TEST_PAGE     = False      # 启用设备测试页面
+ENABLE_POWER_ANALYSIS_PAGE  = False      # 启用功耗分析页面
+ENABLE_OSCILLOSCOPE_PAGE    = False      # 启用虚拟示波器页面
 
 class MainWindow(QMainWindow):
     """主窗口类"""
@@ -229,7 +229,7 @@ class MainWindow(QMainWindow):
         page_classes = {
             "🛠️ 串口调试": SerialDebugPage,
             "📷 Camera调试": CameraDebugPage,
-            "🛰️ GNSS测试": GNSSPage,
+            "🛰️ GNSS测试": GNSSTestPage,
             "🎛️ 设备测试": DeviceTestPage,
             "⚡ 功耗分析": PowerAnalysisPage,
             "📺 虚拟示波器": OscilloscopePage
@@ -252,9 +252,9 @@ class MainWindow(QMainWindow):
         if ENABLE_SERIAL_DEBUG_PAGE:
             nav_buttons_dict["🛠️ 串口调试"] = self.show_serial_debug_page
         if ENABLE_CAMERA_PAGE:
-            nav_buttons_dict["📷 Camera调试"] = self.show_camera_page
+            nav_buttons_dict["📷 Camera调试"] = self.show_camera_debug_page
         if ENABLE_GNSS_PAGE:
-            nav_buttons_dict["🛰️ GNSS测试"] = self.show_gnss_page
+            nav_buttons_dict["🛰️ GNSS测试"] = self.show_gnss_test_page
         if ENABLE_DEVICE_TEST_PAGE:
             nav_buttons_dict["🎛️ 设备测试"] = self.show_device_test_page
         if ENABLE_POWER_ANALYSIS_PAGE:
@@ -351,15 +351,15 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.serial_debug_page)
         self.update_nav_buttons(self.show_serial_debug_page)
 
-    def show_camera_page(self):
+    def show_camera_debug_page(self):
         """显示Camera调试页面"""
         self.stacked_widget.setCurrentWidget(self.camera_page)
-        self.update_nav_buttons(self.show_camera_page)
+        self.update_nav_buttons(self.show_camera_debug_page)
 
-    def show_gnss_page(self):
+    def show_gnss_test_page(self):
         """显示GNSS测试页面"""
         self.stacked_widget.setCurrentWidget(self.gnss_page)
-        self.update_nav_buttons(self.show_gnss_page)
+        self.update_nav_buttons(self.show_gnss_test_page)
 
     def show_device_test_page(self):
         """显示设备测试页面"""

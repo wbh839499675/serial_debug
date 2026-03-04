@@ -63,7 +63,7 @@ THEME_COLORS = {
 GROUP_STYLES = {
     'default': {
         'border': '2px solid #dcdfe6',
-        'border_radius': '8px',
+        'border-radius': '8px',
         'margin_top': '15px',
         'padding_top': '5px',
         'background': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -73,7 +73,7 @@ GROUP_STYLES = {
     },
     'primary': {
         'border': '2px solid #409eff',
-        'border_radius': '8px',
+        'border-radius': '8px',
         'margin_top': '15px',
         'padding_top': '5px',
         'background': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -83,7 +83,7 @@ GROUP_STYLES = {
     },
     'success': {
         'border': '2px solid #67c23a',
-        'border_radius': '8px',
+        'border-radius': '8px',
         'margin_top': '15px',
         'padding_top': '5px',
         'background': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -93,7 +93,7 @@ GROUP_STYLES = {
     },
     'warning': {
         'border': '2px solid #e6a23c',
-        'border_radius': '8px',
+        'border-radius': '8px',
         'margin_top': '15px',
         'padding_top': '5px',
         'background': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -103,7 +103,7 @@ GROUP_STYLES = {
     },
     'danger': {
         'border': '2px solid #f56c6c',
-        'border_radius': '8px',
+        'border-radius': '8px',
         'margin_top': '15px',
         'padding_top': '5px',
         'background': 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -131,7 +131,7 @@ def get_group_style(style_type: str = 'default') -> str:
             font-weight: {style['font_weight']};
             font-size: {style['font_size']};
             border: {style['border']};
-            border-radius: {style['border_radius']};
+            border-radius: {style['border-radius']};
             margin-top: {style['margin_top']};
             padding-top: {style['padding_top']};
             background-color: {style['background']};
@@ -147,6 +147,11 @@ def get_group_style(style_type: str = 'default') -> str:
 
 # 按钮尺寸常量
 BUTTON_SIZES = {
+    'tiny': {
+        'width': 40,
+        'height': 24,
+        'font_size': 8
+    },
     'small': {
         'width': 80,
         'height': 28,
@@ -876,6 +881,10 @@ PAGE_BUTTON_STYLES = {
         'add_device': ('primary', 'small'),
         'remove_device': ('primary', 'small'),
         'import_data': ('primary', 'small'),
+        'toggle_skyview': ('primary', 'small'),
+        'toggle_nmea': ('toggle', 'small'),
+        'toggle_signal': ('toggle', 'small'),
+        'toggle_map': ('toggle', 'small'),
         'clear_data': ('danger', 'small'),
         'stats': ('info', 'small'),
     },
@@ -970,10 +979,12 @@ def get_button_style(style_type: str = 'primary', size: str = 'normal',
     btn_height = height if height is not None else size_config['height']
 
     size_style = f"""
-        width: {btn_width}px;
-        height: {btn_height}px;
+        min-width: {btn_width}px;
+        min-height: {btn_height}px;
+        max-width: {btn_width}px;
+        max-height: {btn_height}px;
         font-size: {size_config['font_size']}pt;
-        padding: 4px 8px;
+        padding: 2px 4px;
     """
 
     return f"""
@@ -2093,11 +2104,11 @@ CUSTOM_DIALOG_STYLES = {
         'main_container': {
             'background': 'qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0a0e27, stop:0.3 #151932, stop:1 #1e2139)',
             'border': '1px solid #409eff',
-            'border_radius': '8px'
+            'border-radius': '8px'
         },
         'title_bar': {
             'background': 'qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1a1f35, stop:0.5 #232942, stop:1 #409eff)',
-            'border_radius': '8px'
+            'border-radius': '8px'
         },
         'title': {
             'color': '#ffffff',
@@ -2114,7 +2125,7 @@ CUSTOM_DIALOG_STYLES = {
                 'color': 'white',
                 'font_weight': '600',
                 'padding': '6px 20px',
-                'border_radius': '4px',
+                'border-radius': '4px',
                 'font_size': '10pt'
             },
             'hover': {
@@ -2129,11 +2140,11 @@ CUSTOM_DIALOG_STYLES = {
         'main_container': {
             'background': 'qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f5f7fa)',
             'border': '1px solid #e4e7ed',
-            'border_radius': '12px'
+            'border-radius': '12px'
         },
         'title_bar': {
             'background': 'qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #409eff, stop:1 #66b1ff)',
-            'border_radius': '12px'
+            'border-radius': '12px'
         },
         'title': {
             'color': '#ffffff',
@@ -2150,7 +2161,7 @@ CUSTOM_DIALOG_STYLES = {
                 'color': 'white',
                 'font_weight': '600',
                 'padding': '8px 24px',
-                'border_radius': '6px',
+                'border-radius': '6px',
                 'font_size': '11pt'
             },
             'hover': {
@@ -2165,11 +2176,11 @@ CUSTOM_DIALOG_STYLES = {
         'main_container': {
             'background': 'qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0d1117, stop:0 #161b22, stop:1 #21262d)',
             'border': '1px solid #58a6ff',
-            'border_radius': '12px'
+            'border-radius': '12px'
         },
         'title_bar': {
             'background': 'qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d1117, stop:0.5 #161b22, stop:1 #58a6ff)',
-            'border_radius': '12px'
+            'border-radius': '12px'
         },
         'title': {
             'color': '#58a6ff',
@@ -2186,7 +2197,7 @@ CUSTOM_DIALOG_STYLES = {
                 'color': 'white',
                 'font_weight': '600',
                 'padding': '10px 28px',
-                'border_radius': '6px',
+                'border-radius': '6px',
                 'font_size': '12pt'
             },
             'hover': {
@@ -2201,11 +2212,11 @@ CUSTOM_DIALOG_STYLES = {
         'main_container': {
             'background': 'qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 0.9), stop:1 rgba(255, 255, 255, 0.7))',
             'border': '1px solid rgba(64, 158, 255, 0.3)',
-            'border_radius': '16px'
+            'border-radius': '16px'
         },
         'title_bar': {
             'background': 'qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(64, 158, 255, 0.8), stop:1 rgba(64, 158, 255, 0.6))',
-            'border_radius': '16px'
+            'border-radius': '16px'
         },
         'title': {
             'color': '#409eff',
@@ -2222,7 +2233,7 @@ CUSTOM_DIALOG_STYLES = {
                 'color': 'white',
                 'font_weight': '600',
                 'padding': '10px 28px',
-                'border_radius': '8px',
+                'border-radius': '8px',
                 'font_size': '12pt'
             },
             'hover': {
@@ -2244,8 +2255,8 @@ def get_message_box_style(style_type: str = 'default', **kwargs) -> str:
         style['background'] = kwargs['background']
     if 'border' in kwargs:
         style['border'] = kwargs['border']
-    if 'border_radius' in kwargs:
-        style['border_radius'] = kwargs['border_radius']
+    if 'border-radius' in kwargs:
+        style['border-radius'] = kwargs['border-radius']
     if 'title_color' in kwargs:
         style['title_color'] = kwargs['title_color']
     if 'text_color' in kwargs:
@@ -2256,7 +2267,7 @@ def get_message_box_style(style_type: str = 'default', **kwargs) -> str:
         QMessageBox {{
             background: {style['background']};
             border: {style['border']};
-            border-radius: {style['border_radius']};
+            border-radius: {style['border-radius']};
         }}
         QMessageBox QLabel {{
             color: {style['text_color']};
@@ -2322,8 +2333,8 @@ def get_custom_dialog_style(style_type: str = 'tech', **kwargs) -> str:
         }}
         QWidget#title_bar {{
             {title_bar_style}
-            border-top-left-radius: {style['main_container']['border_radius']};
-            border-top-right-radius: {style['main_container']['border_radius']};
+            border-top-left-radius: {style['main_container']['border-radius']};
+            border-top-right-radius: {style['main_container']['border-radius']};
         }}
         QLabel#title_label {{
             {title_style}
@@ -2385,7 +2396,7 @@ def get_page_message_box_style(page: str, box_type: str, **kwargs) -> str:
     Args:
         page: 页面名称 ('serial_debug', 'device_test', 'power_analysis')
         box_type: MessageBox类型 ('info', 'warning', 'error', 'question', 'success')
-        **kwargs: 其他参数，如background、border、border_radius等
+        **kwargs: 其他参数，如background、border、border-radius等
 
     Returns:
         样式字符串
