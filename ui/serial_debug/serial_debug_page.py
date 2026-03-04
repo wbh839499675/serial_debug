@@ -2,13 +2,14 @@
 串口调试页面模块
 """
 from typing import Dict, Tuple
-from PyQt5.QtCore import pyqtSignal, QTimer, Qt, QThread, QObject
+from PyQt5.QtCore import pyqtSignal, QTimer, Qt, QThread, QObject, QRect, QSize
 import serial.tools.list_ports
 from PyQt5.QtWidgets import (
     QWidget, QListWidgetItem, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
-    QPushButton, QCheckBox, QLineEdit, QTextEdit, QSplitter, QDialog
+    QPushButton, QCheckBox, QLineEdit, QTextEdit, QSplitter, QDialog, QSizePolicy
 )
 
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QPainter, QTextBlock
 from utils.logger import Logger
 from utils.constants import UI_SERIAL_DEBUG
 from utils.constants import (
@@ -432,6 +433,9 @@ class SerialDebugTab(QWidget):
         # 初始化各个管理器
         self._init_managers()
 
+        # 为接收区添加双击事件
+        self.recv_text.mouseDoubleClickEvent = self._on_recv_text_double_click
+
     def _create_io_widget(self):
         """创建接收和发送区域"""
         from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
@@ -489,9 +493,17 @@ class SerialDebugTab(QWidget):
         self.pause_recv_check.stateChanged.connect(self.events.on_pause_recv_changed)
         recv_options_layout.addWidget(self.pause_recv_check)
 
+        self.show_line_numbers_check = recv_options['show_line_numbers']
+        self.show_line_numbers_check.stateChanged.connect(self.events.on_show_line_numbers_changed)
+        recv_options_layout.addWidget(self.show_line_numbers_check)
+
         self.auto_save_check = recv_options['auto_save']
         self.auto_save_check.stateChanged.connect(self.events.on_auto_save_changed)
         recv_options_layout.addWidget(self.auto_save_check)
+
+        self.search_btn = recv_options['search']
+        self.search_btn.clicked.connect(self.events.show_search_dialog)
+        recv_options_layout.addWidget(self.search_btn)
 
         recv_options_layout.addStretch()
 
@@ -502,8 +514,30 @@ class SerialDebugTab(QWidget):
         recv_layout.addWidget(recv_options_widget)
 
         # 创建接收文本框
+        """
         self.recv_text = SerialDebugTabLayout.create_recv_text()
         recv_layout.addWidget(self.recv_text)
+        """
+        # 创建接收文本框容器
+        recv_text_container = QWidget()
+        recv_text_layout = QHBoxLayout(recv_text_container)
+        recv_text_layout.setContentsMargins(0, 0, 0, 0)
+        recv_text_layout.setSpacing(0)
+
+        # 创建接收文本框
+        self.recv_text = SerialDebugTabLayout.create_recv_text()
+        self.recv_text.setLineWrapMode(QTextEdit.NoWrap)  # 不自动换行
+
+        # 创建行号区域
+        self.line_number_area = LineNumberArea(self.recv_text)
+        # 连接信号
+        self.recv_text.textChanged.connect(lambda: self.updateLineNumberAreaWidth(0))
+
+        # 添加到布局
+        recv_text_layout.addWidget(self.line_number_area)
+        recv_text_layout.addWidget(self.recv_text, 1)
+
+        recv_layout.addWidget(recv_text_container)
 
         # 创建统计标签
         stats_widget = QWidget()
@@ -1204,6 +1238,214 @@ class SerialDebugTab(QWidget):
         else:
             super().keyPressEvent(event)
 
+    def show_search_dialog(self):
+        """显示搜索对话框"""
+        self.events.show_search_dialog()
+
+    def search_in_log(self, text: str, case_sensitive: bool, use_regex: bool, whole_word: bool, start_position: int = 0) -> list:
+        """在日志中搜索文本
+
+        Args:
+            text: 搜索文本
+            case_sensitive: 是否区分大小写
+            use_regex: 是否使用正则表达式
+            whole_word: 是否全词匹配
+            start_position: 搜索起始位置
+
+        Returns:
+            匹配位置列表，每个元素为 (start_pos, end_pos) 元组
+        """
+        Logger.log(f"开始搜索: {text}, 区分大小写: {case_sensitive}, 正则表达式: {use_regex}, 全词匹配: {whole_word}, 起始位置: {start_position}", "DEBUG")
+
+        # 获取接收区文本
+        document = self.recv_text.document()
+        plain_text = document.toPlainText()
+
+        if not text or not plain_text:
+            Logger.log("搜索文本或接收区为空", "DEBUG")
+            return []
+
+        results = []
+
+        try:
+            if use_regex:
+                # 正则表达式搜索
+                flags = 0 if case_sensitive else re.IGNORECASE
+                pattern = re.compile(text, flags)
+
+                for match in pattern.finditer(plain_text):
+                    start = match.start()
+                    end = match.end()
+                    # 只添加起始位置之后的匹配项
+                    if start >= start_position:
+                        results.append((start, end))
+                        Logger.log(f"找到匹配: 位置 {start}-{end}", "DEBUG")
+            else:
+                # 普通文本搜索
+                search_text = text
+                search_content = plain_text
+
+                if not case_sensitive:
+                    search_text = text.lower()
+                    search_content = plain_text.lower()
+
+                if whole_word:
+                    # 全词匹配
+                    word_pattern = r'\b' + re.escape(text) + r'\b'
+                    flags = 0 if case_sensitive else re.IGNORECASE
+                    pattern = re.compile(word_pattern, flags)
+
+                    for match in pattern.finditer(plain_text):
+                        start = match.start()
+                        end = match.end()
+                        # 只添加起始位置之后的匹配项
+                        if start >= start_position:
+                            results.append((start, end))
+                            Logger.log(f"找到匹配: 位置 {start}-{end}", "DEBUG")
+                else:
+                    # 普通搜索
+                    start = max(start_position, 0)
+                    while True:
+                        pos = search_content.find(search_text, start)
+                        if pos == -1:
+                            break
+                        end = pos + len(text)
+                        results.append((pos, end))
+                        start = end
+                        Logger.log(f"找到匹配: 位置 {pos}-{end}", "DEBUG")
+        except Exception as e:
+            Logger.log(f"搜索出错: {str(e)}", "ERROR")
+            return []
+
+        Logger.log(f"搜索完成，找到 {len(results)} 个匹配项", "DEBUG")
+        return results
+
+    def highlight_search_result(self, start_pos: int, end_pos: int, scroll_to: bool = True, all_matches: list = None):
+        """高亮显示搜索结果
+
+        Args:
+            start_pos: 起始位置
+            end_pos: 结束位置
+            scroll_to: 是否滚动到匹配位置
+            all_matches: 所有匹配位置列表，用于高亮所有匹配项
+        """
+        Logger.log(f"高亮搜索结果: {start_pos}-{end_pos}, 滚动: {scroll_to}", "DEBUG")
+
+        # 获取文档和光标
+        document = self.recv_text.document()
+        cursor = self.recv_text.textCursor()
+
+        # 只清除之前的高亮，而不是清除所有格式
+        # 保存当前文档的原始格式
+        original_format = QTextCharFormat()
+
+        # 如果提供了所有匹配项，高亮所有匹配项
+        if all_matches:
+            for match_start, match_end in all_matches:
+                cursor.setPosition(match_start)
+                cursor.setPosition(match_end, QTextCursor.KeepAnchor)
+                format = QTextCharFormat()
+                format.setBackground(QColor(255, 255, 0, 100))  # 半透明黄色背景
+                cursor.mergeCharFormat(format)
+                Logger.log(f"高亮匹配项: {match_start}-{match_end}", "DEBUG")
+
+        # 高亮当前匹配项
+        cursor.setPosition(start_pos)
+        cursor.setPosition(end_pos, QTextCursor.KeepAnchor)
+        format = QTextCharFormat()
+        format.setBackground(QColor(255, 165, 0))  # 橙色背景
+        cursor.mergeCharFormat(format)
+
+        # 滚动到匹配位置
+        if scroll_to:
+            self.recv_text.setTextCursor(cursor)
+            self.recv_text.ensureCursorVisible()
+
+        Logger.log("高亮完成", "DEBUG")
+
+
+    def _on_recv_text_double_click(self, event):
+        """处理接收区双击事件"""
+        # 获取当前光标位置
+        cursor = self.recv_text.textCursor()
+        position = cursor.position()
+
+        # 更新搜索对话框的起始位置
+        if hasattr(self, 'search_dialog'):
+            self.search_dialog.search_start_position = position
+            Logger.log(f"双击接收区，设置搜索起始位置: {position}", "DEBUG")
+
+    def lineNumberAreaWidth(self):
+        """计算行号区域宽度"""
+        digits = 1
+        max_value = max(1, self.recv_text.document().blockCount())
+        while max_value >= 10:
+            max_value /= 10
+            digits += 1
+        space = 3 + self.recv_text.fontMetrics().horizontalAdvance('9') * digits
+        return space
+
+    def lineNumberAreaPaintEvent(self, event):
+        """绘制行号"""
+        painter = QPainter(self.line_number_area)
+        painter.fillRect(event.rect(), QColor(240, 240, 240))  # 浅灰色背景
+
+        # 设置字体与接收文本框一致
+        painter.setFont(self.recv_text.font())
+
+        # 获取文档和视口
+        document = self.recv_text.document()
+        viewport = self.recv_text.viewport()
+
+        # 计算可见区域
+        scroll_y = self.recv_text.verticalScrollBar().value()
+        block = document.begin()
+        block_number = 0
+
+        # 遍历所有文本块，找到可见块
+        while block.isValid():
+            # 获取块的位置
+            block_geometry = document.documentLayout().blockBoundingRect(block)
+            block_top = block_geometry.top() - scroll_y + 8
+            block_bottom = block_top + block_geometry.height()
+
+            # 如果块在可见区域内，绘制行号
+            if block_bottom >= 0 and block_top <= viewport.height():
+                number = str(block_number + 1)
+                painter.setPen(QColor(128, 128, 128))  # 灰色文字
+                # 调整垂直位置，使行号与文本行基线对齐
+                font_metrics = painter.fontMetrics()
+                text_height = font_metrics.height()
+                # 计算基线位置：块顶部 + (块高度 - 文本高度) / 2 + 字体上升高度
+                baseline = block_top + (block_geometry.height() - text_height) / 2 + font_metrics.ascent()
+                painter.drawText(0, int(block_top), self.line_number_area.width(),
+                            self.recv_text.fontMetrics().height(),
+                            Qt.AlignRight, number)
+
+            # 如果块已经超出可见区域下方，停止遍历
+            if block_top > viewport.height():
+                break
+
+            block = block.next()
+            block_number += 1
+
+    def updateLineNumberAreaWidth(self, newBlockCount):
+        # 计算行号区域宽度
+        width = self.lineNumberAreaWidth()
+        # 设置TextEdit的左边距为行号区域宽度，确保文本与行号对齐
+        #self.recv_text.setViewportMargins(width, 0, 0, 0)
+        self.line_number_area.setFixedWidth(width)
+
+    def updateLineNumberArea(self, rect, dy):
+        """更新行号区域显示"""
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
+
+        if rect.contains(self.recv_text.viewport().rect()):
+            self.updateLineNumberAreaWidth(0)
+
 
 class SerialDebugCoordinator(QObject):
     """串口调试协调器，负责各模块间的通信协调"""
@@ -1228,4 +1470,30 @@ class SerialDebugCoordinator(QObject):
         self.data_sender.send_request.connect(
             self.serial_manager.write
         )
+
+class LineNumberArea(QWidget):
+    """行号显示区域"""
+    def __init__(self, editor):
+        super().__init__(editor)
+        self.editor = editor
+
+    def sizeHint(self):
+        # 获取编辑器的父级SerialDebugTab对象
+        parent = self.editor.parent()
+        while parent and not isinstance(parent, SerialDebugTab):
+            parent = parent.parent()
+
+        if parent:
+            return QSize(parent.lineNumberAreaWidth(), 0)
+        return QSize(30, 0)  # 默认宽度
+
+
+    def paintEvent(self, event):
+        # 获取编辑器的父级SerialDebugTab对象
+        parent = self.editor.parent()
+        while parent and not isinstance(parent, SerialDebugTab):
+            parent = parent.parent()
+
+        if parent:
+            parent.lineNumberAreaPaintEvent(event)
 

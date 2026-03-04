@@ -15,6 +15,9 @@ from utils.constants import (
     get_page_text_edit_style
 )
 
+from ui.dialogs import CustomMessageBox, LogSearchDialog
+
+
 class SerialDebugPageEvents:
     """串口调试页面事件处理器"""
 
@@ -355,3 +358,63 @@ class SerialDebugTabEvents:
     def on_refresh_ports(self):
         """刷新串口列表"""
         self.tab.parent.refresh_ports()
+
+    def show_search_dialog(self):
+        """显示搜索对话框"""
+        if not hasattr(self.tab, 'search_dialog'):
+            self.tab.search_dialog = LogSearchDialog(self.tab)
+
+            # 连接搜索信号到正确的处理方法
+            self.tab.search_dialog.search_requested.connect(
+                self._on_search_requested
+            )
+
+            # 连接高亮信号（如果对话框有此信号）
+            if hasattr(self.tab.search_dialog, 'highlight_requested'):
+                self.tab.search_dialog.highlight_requested.connect(
+                    lambda start, end, all_matches: self.tab.highlight_search_result(start, end, True, all_matches)
+                )
+
+        self.tab.search_dialog.show()
+        self.tab.search_dialog.raise_()
+        self.tab.search_dialog.activateWindow()
+
+    def _on_search_requested(self, text: str, case_sensitive: bool, use_regex: bool, whole_word: bool):
+        """处理搜索请求"""
+        Logger.log(f"接收到搜索请求: {text}", "DEBUG")
+
+        # 执行搜索
+        results = self.tab.search_in_log(text, case_sensitive, use_regex, whole_word)
+        Logger.log(f"搜索完成，找到 {len(results)} 个匹配项", "DEBUG")
+
+        # 更新搜索对话框的结果
+        if hasattr(self.tab, 'search_dialog'):
+            self.tab.search_dialog.search_results = results
+
+            if results:
+                self.tab.search_dialog.current_match_index = 0
+                self.tab.search_dialog._highlight_current_match()
+                self.tab.search_dialog.result_label.setText(f"找到 {len(results)} 个匹配项")
+                self.tab.search_dialog.next_btn.setEnabled(len(results) > 1)
+                self.tab.search_dialog.prev_btn.setEnabled(False)
+                Logger.log(f"已更新搜索对话框结果，当前索引: {self.tab.search_dialog.current_match_index}", "DEBUG")
+            else:
+                self.tab.search_dialog.result_label.setText("未找到匹配项")
+                self.tab.search_dialog.next_btn.setEnabled(False)
+                self.tab.search_dialog.prev_btn.setEnabled(False)
+                Logger.log("未找到匹配项", "DEBUG")
+        else:
+            Logger.log("搜索对话框不存在", "ERROR")
+
+    def on_show_line_numbers_changed(self, state):
+        """显示行号改变"""
+        if state == Qt.Checked:
+            # 显示行号区域
+            self.tab.line_number_area.setVisible(True)
+            # 更新行号区域宽度
+            self.tab.updateLineNumberAreaWidth(0)
+        else:
+            # 隐藏行号区域
+            self.tab.line_number_area.setVisible(False)
+            # 重置TextEdit的左边距
+            self.tab.recv_text.setViewportMargins(0, 0, 0, 0)

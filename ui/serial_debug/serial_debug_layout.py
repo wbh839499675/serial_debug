@@ -184,6 +184,25 @@ class SerialDebugTabLayout:
         auto_save_check = QCheckBox("自动保存日志")
         auto_save_check.setChecked(False)
 
+        show_line_numbers_check = QCheckBox("显示行号")
+        show_line_numbers_check.setChecked(True)
+
+        search_btn = QPushButton("🔍 搜索")
+        #search_btn.setToolTip("搜索日志")
+        search_btn.setFixedSize(64, 32)
+        search_btn.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                font-size: 9pt;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                border-radius: 4px;
+            }
+        """)
+
+
         clear_recv_btn = QPushButton("🗑 清除")
         #clear_recv_btn.setStyleSheet(get_page_button_style('serial_debug', 'clear'))
         clear_recv_btn.setStyleSheet("""
@@ -205,8 +224,10 @@ class SerialDebugTabLayout:
             'auto_scroll': auto_scroll_check,
             'timestamp': timestamp_recv_check,
             'pause': pause_recv_check,
+            'show_line_numbers': show_line_numbers_check,
             'auto_save': auto_save_check,
-            'clear': clear_recv_btn
+            'clear': clear_recv_btn,
+            'search': search_btn
         }
 
     @staticmethod

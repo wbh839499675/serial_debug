@@ -1020,3 +1020,220 @@ class CustomMessageBox(QDialog):
             }}
         """)
 
+class LogSearchDialog(QDialog):
+    """日志搜索对话框"""
+
+    # 添加搜索信号
+    search_requested = pyqtSignal(str, bool, bool, bool)  # 搜索文本, 区分大小写, 正则表达式, 全词匹配
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("日志搜索")
+        self.setFixedSize(500, 200)
+
+        # 初始化UI
+        self.init_ui()
+
+        # 连接信号
+        self._connect_signals()
+
+        # 搜索结果列表
+        self.search_results = []
+        self.current_match_index = -1
+
+    def init_ui(self):
+        """初始化UI"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # 搜索框布局
+        options_layout = QHBoxLayout()
+        search_label = QLabel("🔍 搜索:")
+        search_label.setStyleSheet("font-weight: bold;")
+        options_layout.addWidget(search_label)
+
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("输入搜索关键词...")
+        self.search_edit.setMinimumHeight(32)
+        options_layout.addWidget(self.search_edit, 1)
+
+        self.case_sensitive_check = QCheckBox("区分大小写")
+        options_layout .addWidget(self.case_sensitive_check)
+
+        self.regex_check = QCheckBox("正则表达式")
+        options_layout.addWidget(self.regex_check)
+
+        self.whole_word_check = QCheckBox("全词匹配")
+        options_layout .addWidget(self.whole_word_check)
+
+        layout.addLayout(options_layout)
+
+        # 添加搜索按钮
+        self.search_btn = QPushButton("搜索")
+        self.search_btn.clicked.connect(self._on_search)
+        layout.addWidget(self.search_btn)
+
+        # 导航按钮
+        nav_layout = QHBoxLayout()
+
+        self.prev_btn = QPushButton("上一个")
+        self.prev_btn.setEnabled(True)
+        nav_layout.addWidget(self.prev_btn)
+
+        self.next_btn = QPushButton("下一个")
+        self.next_btn.setEnabled(True)
+        nav_layout.addWidget(self.next_btn)
+
+        layout.addLayout(nav_layout)
+
+        # 搜索结果标签
+        self.result_label = QLabel("未找到匹配项")
+        layout.addWidget(self.result_label)
+
+    def _connect_signals(self):
+        """连接信号槽"""
+        # 确保search_btn已存在
+        if hasattr(self, 'search_btn'):
+            self.search_btn.clicked.connect(self._on_search)
+        else:
+            # 如果search_btn不存在，创建它
+            self.search_btn = QPushButton("搜索")
+            self.search_btn.clicked.connect(self._on_search)
+
+        self.next_btn.clicked.connect(self._on_next)
+        self.prev_btn.clicked.connect(self._on_prev)
+        self.search_edit.returnPressed.connect(self._on_search)
+
+    def _on_search(self):
+        """执行搜索"""
+        text = self.search_edit.text()
+        if not text:
+            Logger.log("搜索文本为空，跳过搜索", "DEBUG")
+            return
+
+        Logger.log(f"开始搜索: {text}", "DEBUG")
+
+        # 获取搜索选项
+        case_sensitive = self.case_sensitive_check.isChecked()
+        use_regex = self.regex_check.isChecked()
+        whole_word = self.whole_word_check.isChecked()
+
+        Logger.log(f"搜索选项 - 区分大小写: {case_sensitive}, 正则表达式: {use_regex}, 全词匹配: {whole_word}", "DEBUG")
+
+        # 发出搜索信号
+        self.search_requested.emit(text, case_sensitive, use_regex, whole_word)
+        Logger.log("已发出搜索信号", "DEBUG")
+
+    def _on_next(self):
+        """查找下一个"""
+        Logger.log(f"点击下一个按钮，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
+
+        if not self.search_results:
+            Logger.log("没有搜索结果，无法跳转", "WARNING")
+            return
+
+        self.current_match_index = (self.current_match_index + 1) % len(self.search_results)
+        Logger.log(f"跳转到索引: {self.current_match_index}", "DEBUG")
+
+        self._highlight_current_match()
+        self.prev_btn.setEnabled(True)
+
+    def _on_prev(self):
+        """查找上一个"""
+        Logger.log(f"点击上一个按钮，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
+
+        if not self.search_results:
+            Logger.log("没有搜索结果，无法跳转", "WARNING")
+            return
+
+        self.current_match_index = (self.current_match_index - 1) % len(self.search_results)
+        Logger.log(f"跳转到索引: {self.current_match_index}", "DEBUG")
+
+        self._highlight_current_match()
+        self.next_btn.setEnabled(True)
+
+    def on_prev_match(self):
+        """跳转到上一个匹配项"""
+        if not self.current_matches:
+            return
+
+        if self.current_index <= 0:
+            self.current_index = len(self.current_matches) - 1
+        else:
+            self.current_index -= 1
+
+        self.highlight_match()
+        self.update_status()
+
+    def on_next_match(self):
+        """跳转到下一个匹配项"""
+        if not self.current_matches:
+            return
+
+        if self.current_index >= len(self.current_matches) - 1:
+            self.current_index = 0
+        else:
+            self.current_index += 1
+
+        self.highlight_match()
+        self.update_status()
+
+    def _highlight_current_match(self):
+        """高亮当前匹配项"""
+        Logger.log(f"高亮匹配项，当前索引: {self.current_match_index}, 总匹配数: {len(self.search_results)}", "DEBUG")
+
+        if not self.search_results:
+            Logger.log("没有搜索结果，无法高亮", "WARNING")
+            return
+
+        start, end = self.search_results[self.current_match_index]
+        Logger.log(f"高亮范围: {start}-{end}", "DEBUG")
+
+        # 调用父窗口的高亮方法
+        if hasattr(self.parent(), 'highlight_search_result'):
+            self.parent().highlight_search_result(
+                start, end, True, self.search_results
+            )
+            Logger.log("已调用父窗口高亮方法", "DEBUG")
+        else:
+            Logger.log("父窗口没有highlight_search_result方法", "ERROR")
+
+        # 更新结果标签
+        self.result_label.setText(
+            f"匹配 {self.current_match_index + 1}/{len(self.search_results)}"
+        )
+
+    def update_status(self):
+        """更新状态标签"""
+        if not self.current_matches:
+            self.status_label.setText("未找到匹配项")
+        else:
+            self.status_label.setText(f"找到 {len(self.current_matches)} 个匹配项，当前第 {self.current_index + 1} 个")
+
+    def search(self, text: str):
+        """执行搜索
+
+        Args:
+            text: 要搜索的文本
+        """
+        self.current_matches = []
+        self.current_index = -1
+
+        if not text:
+            self.update_status()
+            return
+
+        # 获取搜索参数
+        case_sensitive = self.case_sensitive_check.isChecked()
+        use_regex = self.regex_check.isChecked()
+        whole_word = self.whole_word_check.isChecked()
+
+        # 通知父窗口执行搜索
+        self.current_matches = self.parent().search_in_log(text, case_sensitive, use_regex, whole_word)
+
+        # 如果有匹配项，选中第一个
+        if self.current_matches:
+            self.current_index = 0
+            self.highlight_match()
+
+        self.update_status()
