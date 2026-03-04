@@ -52,12 +52,12 @@ class SerialReader(QObject):
                     Logger.log(f"读取数据异常: {str(e)}", "ERROR")
                     break  # 发生错误时退出循环
 
-
-
-class SerialController:
-    """串口控制器"""
+class SerialController(QObject):
+    # 添加状态变化信号
+    status_changed = pyqtSignal(str)
 
     def __init__(self):
+        super().__init__()
         self.serial_port = None
         self.reader = None
         self.read_thread = None

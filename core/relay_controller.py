@@ -4,14 +4,15 @@
 """
 import serial
 import time
-from typing import Tuple
-from utils.constants import RELAY_COMMANDS
-from typing import Optional
+from typing import Tuple, Optional
+from PyQt5.QtCore import QObject, pyqtSignal
 
-class RelayController:
-    """继电器控制器类"""
+class RelayController(QObject):
+    # 添加状态变化信号
+    status_changed = pyqtSignal(str)
 
     def __init__(self):
+        super().__init__()  # 添加父类初始化
         self.serial_port = None
         self.is_open = False
         self.baudrate = 9600
