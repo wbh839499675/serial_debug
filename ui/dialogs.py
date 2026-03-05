@@ -724,7 +724,7 @@ class FileSendDialog(QDialog):
 class LoadingDialog(QDialog):
     """加载动画对话框"""
 
-    def __init__(self, parent=None, message="正在处理数据，请稍候..."):
+    def __init__(self, parent=None, message="加载中..."):
         super().__init__(parent)
         self.setWindowFlags(Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
         self.setWindowModality(Qt.ApplicationModal)

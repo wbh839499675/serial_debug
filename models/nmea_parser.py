@@ -127,7 +127,7 @@ class NMEAParser:
                 return {'type': 'UNKNOWN', 'raw': sentence}
 
         except Exception as e:
-            Logger.error(f"解析NMEA语句失败: {str(e)}", module='nmea_parser')
+            Logger.error(f"解析NMEA语句失败: {str(e)}", module='gnss')
             return {'type': 'ERROR', 'error': str(e), 'raw': sentence}
     @staticmethod
     def checksum(sentence: str) -> bool:
@@ -228,7 +228,7 @@ class NMEAParser:
 
             return data
         except Exception as e:
-            Logger.error(f"解析GSV语句失败: {str(e)}", module='nmea_parser')
+            Logger.error(f"解析GSV语句失败: {str(e)}", module='gnss')
             return {}
 
 
@@ -348,7 +348,7 @@ class NMEAParser:
             elif sentence_type == 'GSV':
                 gsv_data = NMEAParser.parse_gsv(sentence)
                 # 添加调试日志
-                Logger.debug(f"解析到GSV语句: {sentence}", module='nmea_parser')
+                Logger.debug(f"解析到GSV语句: {sentence}", module='gnss')
 
                 # 按系统分组存储GSV数据
                 gsv_prefix = gsv_data.get('gsv_prefix', '')
@@ -408,13 +408,13 @@ class NMEAParser:
         if gsv_data_by_system:
             all_satellites = []
             for system, gsv_list in gsv_data_by_system.items():
-                Logger.debug(f"处理系统 {system} 的GSV数据", module='nmea_parser')
+                Logger.debug(f"处理系统 {system} 的GSV数据", module='gnss')
                 for gsv_data in gsv_list:
                     satellites = NMEAParser._parse_satellites_from_gsv(gsv_data)
                     all_satellites.extend(satellites)
 
             position_data['satellites'] = all_satellites
-            Logger.debug(f"GSV数据处理完成，卫星数量: {len(all_satellites)}", module='nmea_parser')
+            Logger.debug(f"GSV数据处理完成，卫星数量: {len(all_satellites)}", module='gnss')
 
         return position_data
 
@@ -491,21 +491,21 @@ class NMEAParser:
         satellites = []
         try:
             # 添加调试日志
-            Logger.debug(f"开始解析GSV数据: {gsv_data}", module='nmea_parser')
+            Logger.debug(f"开始解析GSV数据: {gsv_data}", module='gnss')
 
             # 检查GSV数据是否有效
             if not gsv_data or 'satellites' not in gsv_data:
-                Logger.warning("GSV数据无效或缺少satellites字段", module='nmea_parser')
+                Logger.warning("GSV数据无效或缺少satellites字段", module='gnss')
                 return satellites
 
             # 检查卫星数据是否为空
             if not gsv_data['satellites']:
-                Logger.warning("GSV数据中satellites字段为空", module='nmea_parser')
+                Logger.warning("GSV数据中satellites字段为空", module='gnss')
                 return satellites
 
             # 获取GSV前缀（用于识别卫星系统）
             gsv_prefix = gsv_data.get('gsv_prefix', '')
-            Logger.debug(f"GSV前缀: {gsv_prefix}", module='nmea_parser')
+            Logger.debug(f"GSV前缀: {gsv_prefix}", module='gnss')
 
             # 用于去重的字典
             satellite_dict = {}
@@ -523,7 +523,7 @@ class NMEAParser:
 
                     # 识别卫星系统
                     system = NMEAParser._identify_system(prn, gsv_prefix)
-                    #Logger.debug(f"卫星 PRN={prn}, 系统={system}, SNR={snr}", module='nmea_parser')
+                    #Logger.debug(f"卫星 PRN={prn}, 系统={system}, SNR={snr}", module='gnss')
 
                     # 使用PRN作为唯一键进行去重
                     if prn in satellite_dict:
@@ -532,7 +532,7 @@ class NMEAParser:
                             satellite_dict[prn].elevation = elevation
                             satellite_dict[prn].azimuth = azimuth
                             satellite_dict[prn].snr = snr
-                            Logger.debug(f"更新卫星 {prn} 的SNR: {snr}", module='nmea_parser')
+                            Logger.debug(f"更新卫星 {prn} 的SNR: {snr}", module='gnss')
                         continue
 
                     # 创建卫星信息对象
@@ -547,16 +547,16 @@ class NMEAParser:
                     satellite_dict[prn] = satellite
 
                 except Exception as e:
-                    Logger.error(f"解析卫星信息失败: {e}, 卫星数据: {sat_data}", module='nmea_parser')
+                    Logger.error(f"解析卫星信息失败: {e}, 卫星数据: {sat_data}", module='gnss')
                     continue
 
             # 将字典转换为列表
             satellites = list(satellite_dict.values())
 
             # 添加调试日志
-            Logger.debug(f"GSV解析完成，共解析 {len(satellites)} 颗卫星", module='nmea_parser')
+            Logger.debug(f"GSV解析完成，共解析 {len(satellites)} 颗卫星", module='gnss')
         except Exception as e:
-            Logger.error(f"解析GSV数据失败: {str(e)}", module='nmea_parser')
+            Logger.error(f"解析GSV数据失败: {str(e)}", module='gnss')
 
         return satellites
 
@@ -675,7 +675,7 @@ class NMEAParser:
                         continue
 
                     # 添加调试日志，记录所有语句类型
-                    #Logger.debug(f"解析到NMEA语句: {result['type']}", module='nmea_parser')
+                    #Logger.debug(f"解析到NMEA语句: {result['type']}", module='gnss')
 
                     # 提取时间戳
                     sentence_time = None
@@ -708,9 +708,9 @@ class NMEAParser:
                                 position.satellites = satellites
 
                                 # 添加调试日志
-                                #Logger.debug(f"位置点卫星数量: {len(satellites)}", module='nmea_parser')
+                                #Logger.debug(f"位置点卫星数量: {len(satellites)}", module='gnss')
                                 #for sat in satellites:
-                                #    Logger.debug(f"卫星 PRN={sat.prn}, SNR={sat.snr}, 系统={sat.constellation}", module='nmea_parser')
+                                #    Logger.debug(f"卫星 PRN={sat.prn}, SNR={sat.snr}, 系统={sat.constellation}", module='gnss')
 
                                 # 转换坐标
                                 gcj02_lng, gcj02_lat = NMEAParser.wgs84_to_gcj02(
@@ -758,9 +758,9 @@ class NMEAParser:
                     position.satellites = satellites
 
                     # 添加调试日志
-                    Logger.debug(f"位置点卫星数量: {len(satellites)}", module='nmea_parser')
+                    Logger.debug(f"位置点卫星数量: {len(satellites)}", module='gnss')
                     for sat in satellites:
-                        Logger.debug(f"卫星 PRN={sat.prn}, SNR={sat.snr}, 系统={sat.constellation}", module='nmea_parser')
+                        Logger.debug(f"卫星 PRN={sat.prn}, SNR={sat.snr}, 系统={sat.constellation}", module='gnss')
 
                     # 转换坐标
                     gcj02_lng, gcj02_lat = NMEAParser.wgs84_to_gcj02(
@@ -772,9 +772,9 @@ class NMEAParser:
                     positions.append(position)
 
         except Exception as e:
-            Logger.error(f"读取文件 {file_path} 失败: {str(e)}", module='nmea_parser')
+            Logger.error(f"读取文件 {file_path} 失败: {str(e)}", module='gnss')
 
         # 添加调试日志
-        Logger.debug(f"文件解析完成，共解析 {len(positions)} 个位置点", module='nmea_parser')
+        Logger.debug(f"文件解析完成，共解析 {len(positions)} 个位置点", module='gnss')
 
         return positions

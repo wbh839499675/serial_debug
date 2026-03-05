@@ -6,6 +6,11 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt5.QtCore import QTimer
 from .control_tab import ControlTab
 from .config_tab import ConfigTab
+from .network_test_tab import NetworkTestTab
+from .data_test_tab import DataTestTab
+from .sms_test_tab import SMSTestTab
+from .hardware_test_tab import HardwareTestTab
+from .power_test_tab import PowerTestTab
 from .monitor_tab import MonitorTab
 from .result_tab import ResultTab
 from .test_executor import TestExecutor
@@ -13,40 +18,49 @@ from utils.logger import Logger
 
 class DeviceTestPage(QWidget):
     """统一测试页面"""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
         self.test_executor = None
         self.test_running = False
-        
+
         # 初始化UI
         self.init_ui()
         self.init_connections()
         self.init_timers()
-        
+
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
-        
+
         # 创建标签页
         self.tab_widget = QTabWidget()
-        
+
         # 添加各功能标签页
         self.control_tab = ControlTab(self)
         self.config_tab = ConfigTab(self)
         self.monitor_tab = MonitorTab(self)
+        self.network_test_tab = NetworkTestTab(self)
+        self.data_test_tab = DataTestTab(self)
+        self.sms_test_tab = SMSTestTab(self)
+        self.hardware_test_tab = HardwareTestTab(self)
+        self.power_test_tab = PowerTestTab(self)
         self.result_tab = ResultTab(self)
-        
-        self.tab_widget.addTab(self.control_tab, "设备控制")
-        self.tab_widget.addTab(self.config_tab, "测试配置")
-        self.tab_widget.addTab(self.monitor_tab, "实时监控")
-        self.tab_widget.addTab(self.result_tab, "结果分析")
-        
+
+        self.tab_widget.addTab(self.control_tab, "设备控制页")
+        self.tab_widget.addTab(self.config_tab, "手动测试页")
+        self.tab_widget.addTab(self.monitor_tab, "自动化测试页")
+        self.tab_widget.addTab(self.network_test_tab, "网络测试页")
+        self.tab_widget.addTab(self.data_test_tab, "数据业务测试页")
+        self.tab_widget.addTab(self.sms_test_tab, "短信测试页")
+        self.tab_widget.addTab(self.hardware_test_tab, "硬件接口测试页")
+        self.tab_widget.addTab(self.power_test_tab, "功耗测试页")
+        self.tab_widget.addTab(self.result_tab, "日志与报告页")
         layout.addWidget(self.tab_widget)
-        
+
     def init_connections(self):
         """初始化信号连接"""
         # 测试执行器信号连接
@@ -55,7 +69,7 @@ class DeviceTestPage(QWidget):
             self.test_executor.test_finished.connect(self.on_test_finished)
             self.test_executor.test_progress.connect(self.update_progress)
             self.test_executor.case_finished.connect(self.on_case_finished)
-            
+
     def init_timers(self):
         """初始化定时器"""
         # 监控定时器
