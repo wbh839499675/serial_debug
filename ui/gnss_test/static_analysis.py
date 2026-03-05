@@ -3,7 +3,7 @@ GNSS静态分析组件
 """
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtGui import QImage, QPainter, QColor
 import pyqtgraph as pg
 from utils.logger import Logger
 from models.nmea_parser import NMEAParser

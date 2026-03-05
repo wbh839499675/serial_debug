@@ -179,25 +179,23 @@ class GNSSDeviceTab(QWidget):
 
         # 创建天空视图
         self.skyview = SkyViewWidget()
-        self.skyview.setMinimumSize(200, 200)  # 设置最小尺寸为正方形
-        self.skyview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 允许缩放
-        self.skyview_dock = DockableWidget("🌌 天空视图", self.skyview, parent=self, shape='square', width=420)
+        self.skyview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.skyview_dock = DockableWidget("🌌 天空视图", self.skyview, parent=bottom_widget, shape='square', width=420)
         self.skyview_dock.setMinimumSize(220, 220)  # 船坞控件包含标题栏，尺寸稍大
-        self.skyview_dock.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 允许缩放
         grid_layout.addWidget(self.skyview_dock, 0, 0)  # 第一行第一列
 
         # 创建信号强度图
         self.signal_widget = SignalStrengthWidget()
-        self.signal_dock = DockableWidget("📶 信号强度", self.signal_widget, parent=self, shape='rectangle', width=800)
+        self.signal_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.signal_dock = DockableWidget("📶 信号强度", self.signal_widget, parent=bottom_widget, shape='rectangle', width=800)
+        self.signal_dock.setMinimumHeight(250)
         grid_layout.addWidget(self.signal_dock, 0, 1)  # 第一行第二列
 
         # 创建地图组件
         self.map_widget = MapWidget()
-        self.map_widget.setMinimumSize(200, 200)  # 设置最小尺寸为正方形
         self.map_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 允许缩放
-        self.map_dock = DockableWidget("🗺️ 地图", self.map_widget, parent=self, shape='square', width=420)
+        self.map_dock = DockableWidget("🗺️ 地图", self.map_widget, parent=bottom_widget, shape='square', width=420)
         self.map_dock.setMinimumSize(220, 220)  # 船坞控件包含标题栏，尺寸稍大
-        self.map_dock.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 允许缩放
         grid_layout.addWidget(self.map_dock, 1, 0)  # 第二行第一列
 
         # 创建NMEA数据组
@@ -258,7 +256,7 @@ class GNSSDeviceTab(QWidget):
         nmea_layout.addWidget(self.nmea_text)
 
         # 将 NMEA 数据组包装为船坞
-        self.nmea_dock = DockableWidget("📝 NMEA数据", nmea_group, parent=self, shape='rectangle', width=800)
+        self.nmea_dock = DockableWidget("📝 NMEA数据", nmea_group, parent=bottom_widget, shape='rectangle', width=800)
         grid_layout.addWidget(self.nmea_dock, 1, 1)  # 第二行第二列
 
         # 设置网格布局的列宽比例

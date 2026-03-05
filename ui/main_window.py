@@ -143,8 +143,8 @@ class MainWindow(QMainWindow):
         self.update_timer.timeout.connect(self.update_test_stats)
         self.update_timer.start(500)
 
-        self.log_auto_scroll = QCheckBox("自动滚动")
-        self.log_auto_scroll.setChecked(True)
+        #self.log_auto_scroll = QCheckBox("自动滚动")
+        #self.log_auto_scroll.setChecked(True)
 
         # 确保日志控件已创建
         self.log_text = QTextEdit()
@@ -985,8 +985,8 @@ class MainWindow(QMainWindow):
         )
 
         # 使用QTimer在主线程中执行滚动操作
-        if self.log_auto_scroll.isChecked() and self.log_auto_scroll.isChecked():
-            QTimer.singleShot(0, self._scroll_to_bottom)
+        #if self.log_auto_scroll.isChecked() and self.log_auto_scroll.isChecked():
+        #    QTimer.singleShot(0, self._scroll_to_bottom)
 
 
     def _scroll_to_bottom(self):

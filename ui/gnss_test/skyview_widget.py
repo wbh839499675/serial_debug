@@ -32,12 +32,11 @@ class SkyViewWidget(QGraphicsView):
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setBackgroundBrush(QBrush(QColor(30, 30, 50)))
-
         # 设置尺寸策略，允许缩放
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # 设置初始尺寸为正方形
-        self.setFixedSize(400, 400)
+        self.setMinimumSize(200, 200)
 
         # 设置场景矩形，确保内容完整显示
         self.setSceneRect(-200, -200, 400, 400)
@@ -61,10 +60,8 @@ class SkyViewWidget(QGraphicsView):
     def init_skyview(self):
         """初始化天空视图"""
         self.scene.clear()
-
         # 获取控件尺寸的一半作为最大半径
         max_radius = min(self.width(), self.height()) / 2 - 20  # 减去边距
-
         # 绘制同心圆（仰角圈）
         for elevation in range(30, 90, 30):
             radius = max_radius * (90 - elevation) / 90  # 仰角越高，半径越小
@@ -78,7 +75,6 @@ class SkyViewWidget(QGraphicsView):
             text.setPos(0, -radius - 15)
             text.setFont(QFont("Arial", 8))
             self.scene.addItem(text)
-
         # 绘制方位角线
         for azimuth in range(0, 360, 30):
             angle = math.radians(azimuth)
@@ -100,7 +96,6 @@ class SkyViewWidget(QGraphicsView):
                 text.setFont(QFont("Arial", 10, QFont.Bold))
                 self.scene.addItem(text)
 
-
     def fit_to_content(self):
         """自动调整视图以完整显示内容"""
         self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
@@ -112,11 +107,12 @@ class SkyViewWidget(QGraphicsView):
             if prn not in [s.prn for s in satellites]:
                 self.scene.removeItem(item)
                 del self.satellites[prn]
-
+        # 计算当前最大半径
+        max_radius = min(self.width(), self.height()) / 2 - 20
         # 添加或更新卫星
         for sat in satellites:
             # 计算极坐标位置
-            radius = 180 * (90 - sat.elevation) / 90
+            radius = max_radius * (90 - sat.elevation) / 90  # 根据当前尺寸计算半径
             angle = math.radians(sat.azimuth)
             x = radius * math.sin(angle)
             y = -radius * math.cos(angle)
@@ -148,12 +144,9 @@ class SkyViewWidget(QGraphicsView):
         """重写调整大小事件，保持正方形比例"""
         # 获取当前尺寸
         size = event.size()
-
-        # 取宽高中较小的一个作为边长
+        # 计算正方形边长（取宽高中较小的一个）
         side = min(size.width(), size.height())
-
-        # 调整控件大小为正方形
-        self.setFixedSize(side, side)
-
-        # 调用父类的 resizeEvent
+        # 调整场景矩形，确保内容完整显示
+        self.setSceneRect(-side/2, -side/2, side, side)
+        # 调用父类的 resizeEvent，但不强制调整控件大小
         super().resizeEvent(event)

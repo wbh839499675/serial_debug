@@ -7,7 +7,7 @@ from datetime import datetime
 from PyQt5.QtCore import QDateTime, QObject, pyqtSignal, QMetaObject, Qt, Q_ARG, QTimer
 from PyQt5.QtGui import QTextCursor
 import re
-
+from PyQt5 import sip
 from utils.constants import LOG_LEVELS
 
 class Logger(QObject):
@@ -35,6 +35,13 @@ class Logger(QObject):
 
     # 添加主窗口引用
     _main_window = None
+
+     # 添加日志缓冲区相关变量
+    _log_buffers = {}  # 格式: {widget: [log_messages]}
+    _buffer_sizes = {}  # 格式: {widget: buffer_size}
+    _flush_timers = {}  # 格式: {widget: QTimer}
+    _default_buffer_size = 50  # 默认缓冲区大小
+    _default_flush_interval = 100  # 默认刷新间隔(毫秒)
 
 
     @staticmethod
@@ -189,29 +196,69 @@ class Logger(QObject):
             Logger.log(f"写入串口日志失败: {str(e)}", "ERROR")
             return False
     @staticmethod
-    def set_log_target(module_name: str, widget):
+    def set_log_target(module_name: str, widget, buffer_size=None, flush_interval=None):
         """
         设置指定模块的日志输出目标
 
         参数:
             module_name: 模块名称，如 'camera', 'monitor'等
             widget: 日志输出目标控件，通常是QTextEdit
+            buffer_size: 缓冲区大小，如果为None则使用默认值
+            flush_interval: 刷新间隔(毫秒)，如果为None则使用默认值
         """
         # 如果之前有设置过目标，先清理
         if module_name in Logger.log_targets:
             old_widget = Logger.log_targets[module_name]
-            if hasattr(old_widget, 'destroyed'):
-                try:
-                    old_widget.destroyed.disconnect(Logger._on_widget_destroyed)
-                except:
-                    pass
+            if old_widget in Logger._log_buffers:
+                # 刷新并清除旧缓冲区
+                Logger._flush_log_buffer(old_widget)
+                del Logger._log_buffers[old_widget]
+                del Logger._buffer_sizes[old_widget]
+                if old_widget in Logger._flush_timers:
+                    timer = Logger._flush_timers[old_widget]
+                    try:
+                        if timer is not None and not sip.isdeleted(timer):
+                            timer.stop()
+                            timer.deleteLater()
+                    except RuntimeError:
+                        pass
+                    finally:
+                        del Logger._flush_timers[old_widget]
 
         # 设置新的目标
         Logger.log_targets[module_name] = widget
 
-        # 连接销毁信号
-        if widget is not None and hasattr(widget, 'destroyed'):
-            widget.destroyed.connect(lambda: Logger._on_widget_destroyed(module_name))
+        # 如果widget不为None，初始化缓冲区
+        if widget is not None:
+            # 设置缓冲区大小
+            buffer_size = buffer_size if buffer_size is not None else Logger._default_buffer_size
+            Logger._buffer_sizes[widget] = buffer_size
+
+            # 初始化缓冲区
+            Logger._log_buffers[widget] = []
+
+            # 创建刷新定时器 - 确保在主线程中创建
+            flush_interval = flush_interval if flush_interval is not None else Logger._default_flush_interval
+
+            # 使用QTimer.singleShot代替持续运行的定时器，避免线程问题
+            timer = QTimer()
+            timer.setSingleShot(True)  # 设置为单次触发
+
+            # 使用弱引用避免循环引用
+            def flush_buffer():
+                if widget in Logger._log_buffers and Logger._log_buffers[widget]:
+                    Logger._flush_log_buffer(widget)
+                    # 重新设置定时器
+                    if widget in Logger._flush_timers and not sip.isdeleted(Logger._flush_timers[widget]):
+                        Logger._flush_timers[widget].start(flush_interval)
+
+            timer.timeout.connect(flush_buffer)
+            timer.start(flush_interval)
+            Logger._flush_timers[widget] = timer
+
+            # 连接销毁信号
+            if hasattr(widget, 'destroyed'):
+                widget.destroyed.connect(lambda: Logger._on_widget_destroyed(module_name))
 
     @staticmethod
     def _on_widget_destroyed(module_name: str):
@@ -222,7 +269,31 @@ class Logger(QObject):
             module_name: 模块名称
         """
         if module_name in Logger.log_targets:
+            widget = Logger.log_targets[module_name]
+
+            # 清理缓冲区
+            if widget in Logger._log_buffers:
+                del Logger._log_buffers[widget]
+            if widget in Logger._buffer_sizes:
+                del Logger._buffer_sizes[widget]
+
+            # 安全地停止并删除定时器
+            if widget in Logger._flush_timers:
+                timer = Logger._flush_timers[widget]
+                try:
+                    # 检查定时器是否仍然有效
+                    if timer is not None and not sip.isdeleted(timer):
+                        timer.stop()
+                        timer.deleteLater()
+                except RuntimeError:
+                    # 定时器已被删除，忽略错误
+                    pass
+                finally:
+                    del Logger._flush_timers[widget]
+
+            # 清理日志目标
             del Logger.log_targets[module_name]
+
 
     @staticmethod
     def get_log_color(level: str) -> str:
@@ -274,14 +345,108 @@ class Logger(QObject):
         return formatted_message
 
     @staticmethod
+    def _flush_log_buffer(widget):
+        """
+        刷新指定widget的日志缓冲区
+
+        参数:
+            widget: 日志输出目标控件
+        """
+        if widget not in Logger._log_buffers or not Logger._log_buffers[widget]:
+            return
+        try:
+            # 检查widget是否仍然有效
+            if sip.isdeleted(widget):
+                # widget已被删除，清理相关资源
+                if widget in Logger._log_buffers:
+                    del Logger._log_buffers[widget]
+                if widget in Logger._buffer_sizes:
+                    del Logger._buffer_sizes[widget]
+                if widget in Logger._flush_timers:
+                    timer = Logger._flush_timers[widget]
+                    try:
+                        if timer is not None and not sip.isdeleted(timer):
+                            timer.stop()
+                            timer.deleteLater()
+                    except RuntimeError:
+                        pass
+                    finally:
+                        del Logger._flush_timers[widget]
+                return
+
+            # 获取缓冲区中的所有日志消息
+            log_messages = Logger._log_buffers[widget]
+
+            if not log_messages:
+                return
+
+            # 合并所有日志消息
+            combined_message = '\n'.join(log_messages)
+
+            # 使用QMetaObject.invokeMethod确保在主线程中执行
+            QMetaObject.invokeMethod(
+                widget,
+                "append",
+                Qt.QueuedConnection,
+                Q_ARG(str, combined_message)
+            )
+
+            # 清空缓冲区
+            Logger._log_buffers[widget] = []
+        except Exception as e:
+            # 如果widget无效，从缓冲区管理中移除
+            if widget in Logger._log_buffers:
+                del Logger._log_buffers[widget]
+            if widget in Logger._buffer_sizes:
+                del Logger._buffer_sizes[widget]
+            if widget in Logger._flush_timers:
+                timer = Logger._flush_timers[widget]
+                try:
+                    if timer is not None and not sip.isdeleted(timer):
+                        timer.stop()
+                        timer.deleteLater()
+                except RuntimeError:
+                    pass
+                finally:
+                    del Logger._flush_timers[widget]
+
+            # 打印错误到控制台
+            print(f"日志缓冲区刷新失败: {str(e)}")
+
+
+    @staticmethod
+    def flush_all_logs():
+        """刷新所有日志缓冲区"""
+        # 获取所有widget的副本，避免在迭代过程中修改字典
+        widgets = list(Logger._log_buffers.keys())
+
+        # 刷新所有缓冲区
+        for widget in widgets:
+            Logger._flush_log_buffer(widget)
+
+    @staticmethod
     def log(text, level='INFO', widget=None, module='default'):
         # 生成时间戳
         timestamp = QDateTime.currentDateTime().toString('hh:mm:ss.zzz')
+
         # 如果没有指定widget，尝试从模块获取
         if widget is None and module in Logger.log_targets:
             widget = Logger.log_targets[module]
+
+        # 检查widget是否仍然有效
+        if widget is not None:
+            try:
+                # 尝试访问控件的一个属性来检查控件是否仍然有效
+                _ = widget.isVisible()
+            except (RuntimeError, AttributeError):
+                # 控件已被删除，清除日志目标
+                if module in Logger.log_targets:
+                    del Logger.log_targets[module]
+                widget = None
+
         # 格式化日志消息
         formatted_message = Logger.format_log_message(level, text, timestamp)
+
         # 写入日志文件
         if Logger.log_file:
             try:
@@ -291,26 +456,31 @@ class Logger(QObject):
                 Logger.log_file.flush()
             except Exception as e:
                 print(f"写入日志文件失败: {str(e)}")
-        # 如果有widget，输出到widget
+
+        # 如果有widget，添加到缓冲区
         if widget:
             try:
-                # 检查widget是否仍然有效
-                if hasattr(widget, 'isVisible'):
-                    # 使用QMetaObject.invokeMethod确保在主线程中执行
-                    QMetaObject.invokeMethod(
-                        widget,
-                        "append",
-                        Qt.QueuedConnection,
-                        Q_ARG(str, formatted_message)
-                    )
+                # 添加到缓冲区
+                if widget not in Logger._log_buffers:
+                    Logger._log_buffers[widget] = []
+                    Logger._buffer_sizes[widget] = Logger._default_buffer_size
 
-                    # 自动滚动到底部 - 使用QTimer确保在主线程中执行
-                    if hasattr(widget, 'auto_scroll_log_check') and widget.auto_scroll_log_check.isChecked():
-                        QTimer.singleShot(0, lambda: widget._scroll_to_bottom())
+                Logger._log_buffers[widget].append(formatted_message)
+
+                # 检查是否需要刷新缓冲区
+                buffer_size = Logger._buffer_sizes[widget]
+                if len(Logger._log_buffers[widget]) >= buffer_size:
+                    Logger._flush_log_buffer(widget)
             except Exception as e:
-                # 如果widget无效，从log_targets中移除
-                if module in Logger.log_targets:
-                    del Logger.log_targets[module]
+                # 如果widget无效，从缓冲区管理中移除
+                if widget in Logger._log_buffers:
+                    del Logger._log_buffers[widget]
+                if widget in Logger._buffer_sizes:
+                    del Logger._buffer_sizes[widget]
+                if widget in Logger._flush_timers:
+                    Logger._flush_timers[widget].stop()
+                    del Logger._flush_timers[widget]
+
                 # 打印错误到控制台
                 print(f"[{timestamp}] {level}: {text}")
                 print(f"日志输出失败: {str(e)}")
@@ -320,13 +490,16 @@ class Logger(QObject):
 
         # 如果有主窗口引用，同时更新到主窗口日志
         if Logger._main_window:
-            # 检查主窗口是否有log_text属性
-            if hasattr(Logger._main_window, 'log_text') and widget != Logger._main_window.log_text:
-                Logger._main_window.update_log(f"[{module}] {text}", level)
-            # 如果没有log_text属性，尝试使用update_log方法
-            elif hasattr(Logger._main_window, 'update_log'):
-                Logger._main_window.update_log(f"[{module}] {text}", level)
-
+            try:
+                # 检查主窗口是否有log_text属性
+                if hasattr(Logger._main_window, 'log_text') and widget != Logger._main_window.log_text:
+                    Logger._main_window.update_log(f"[{module}] {text}", level)
+                # 如果没有log_text属性，尝试使用update_log方法
+                elif hasattr(Logger._main_window, 'update_log'):
+                    Logger._main_window.update_log(f"[{module}] {text}", level)
+            except RuntimeError:
+                # 主窗口已被删除，清除引用
+                Logger._main_window = None
 
     @staticmethod
     def debug(text, widget=None, module='default'):

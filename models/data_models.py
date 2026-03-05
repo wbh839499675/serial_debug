@@ -64,6 +64,11 @@ class GNSSStatistics:
         self.invalid_packets = 0
         self.position_updates = 0
         self.satellite_updates = 0
+        self.total_sentences = 0
+        self.valid_sentences = 0
+        self.fix_count = 0
+        self.avg_hdop = 0.0
+        self.avg_snr = 0.0
 
     def update(self, position: 'GNSSPosition', satellites: List[SatelliteInfo]):
         """更新统计信息"""
