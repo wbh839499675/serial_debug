@@ -62,6 +62,10 @@ class SerialController(QObject):
         self.reader = None
         self.read_thread = None
 
+    def is_connected(self) -> bool:
+        """检查串口连接状态"""
+        return self.serial_port and self.serial_port.is_open
+
     def open(self, port: str, baudrate: int = 115200, timeout: int = 1) -> bool:
         """打开串口"""
         try:
@@ -74,27 +78,54 @@ class SerialController(QObject):
         except Exception as e:
             return False
 
-    def close(self):
-        """关闭串口"""
-        if self.reader:
-            self.reader.stop()
-        if self.read_thread and self.read_thread.isRunning():
-            self.read_thread.quit()
-            self.read_thread.wait()
+    def close(self) -> bool:
+        """关闭串口
 
+        Returns:
+            bool: 关闭是否成功
+        """
+        try:
+            if self.reader:
+                self.reader.stop()
+            if self.read_thread and self.read_thread.isRunning():
+                self.read_thread.quit()
+                self.read_thread.wait()
+            if self.serial_port and self.serial_port.is_open:
+                self.serial_port.close()
+            return True
+        except Exception as e:
+            Logger.error(f"关闭串口失败: {str(e)}", module='serial')
+            return False
+
+    def clear_buffers(self):
+        """清空接收缓冲区"""
         if self.serial_port and self.serial_port.is_open:
-            self.serial_port.close()
+            self.serial_port.reset_input_buffer()
+            self.serial_port.reset_output_buffer()
 
     def write(self, data: str):
         """发送数据"""
         if self.serial_port and self.serial_port.is_open:
-            self.serial_port.write((data + '\r\n').encode())
+            #self.serial_port.write((data + '\r\n').encode())
+            self.serial_port.write(data.encode())
 
     def read(self) -> str:
         """读取数据"""
         if self.serial_port and self.serial_port.in_waiting:
             return self.serial_port.read(self.serial_port.in_waiting).decode('utf-8', errors='ignore')
         return ""
+
+    def available(self) -> int:
+        """获取可读数据字节数"""
+        if self.serial_port and self.serial_port.is_open:
+            return self.serial_port.in_waiting
+        return 0
+
+    def read_all(self) -> bytes:
+        """读取所有可用数据"""
+        if self.serial_port and self.serial_port.is_open:
+            return self.serial_port.read_all()
+        return b''
 
     def flush(self):
         """清空缓冲区"""
@@ -114,3 +145,19 @@ class SerialController(QObject):
             }
             for port in ports
         ]
+
+    def read_response(self, port_name, timeout=1.0):
+        """读取串口响应"""
+        if not self.serial_port or not self.serial_port.is_open:
+            return None
+
+        # 设置读取超时
+        self.serial_port.timeout = timeout
+
+        try:
+            # 读取响应数据
+            response = self.serial_port.read_all().decode('utf-8', errors='ignore')
+            return response.strip()
+        except Exception as e:
+            Logger.error(f"读取串口响应失败: {str(e)}", module='serial_controller')
+            return None
