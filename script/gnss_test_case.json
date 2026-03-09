@@ -1,0 +1,93 @@
+[
+  {
+    "name": "GNSS配置,测试命令",
+    "command": "AT+MGPSCFG=?",
+    "expected_response": "+MGPSCFG:",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "GNSS配置，查询命令",
+    "command": "AT+MGPSCFG?",
+    "expected_response": "+CME ERROR: 501",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "设置NMEA输出到USBAT",
+    "command": "AT+MGPSCFG=\"outport\",\"usbat\"",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "设置NMEA输出到USBNMEA",
+    "command": "AT+MGPSCFG=\"outport\",\"usbnmea\"",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "设置NMEA输出到UART1",
+    "command": "AT+MGPSCFG=\"outport\",\"uart1\"",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "启用GNSS自启动",
+    "command": "AT+MGPSCFG=\"autogps\",1",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "关闭GNSS自启动",
+    "command": "AT+MGPSCFG=\"autogps\",0",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "打开GNSS会话",
+    "command": "AT+MGPS=1",
+    "expected_response": "OK",
+    "timeout": 5000,
+    "priority": 1
+  },
+  {
+    "name": "查询GNSS会话状态",
+    "command": "AT+MGPS?",
+    "expected_response": "+MGPS: 1",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "获取GGA语句",
+    "command": "AT+MGPSNMEA=\"GGA\"",
+    "expected_response": "+MGPSNMEA:",
+    "timeout": 10.0,
+    "priority": 1
+  },
+  {
+    "name": "获取RMC语句",
+    "command": "AT+MGPSNMEA=\"RMC\"",
+    "expected_response": "+MGPSNMEA:",
+    "timeout": 10.0,
+    "priority": 1
+  },
+  {
+    "name": "关闭GNSS会话",
+    "command": "AT+MGPSEND",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  },
+  {
+    "name": "验证GNSS已关闭",
+    "command": "AT+MGPS?",
+    "expected_response": "+MGPS: 0",
+    "timeout": 3000,
+    "priority": 1
+  }
+]

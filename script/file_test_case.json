@@ -1,0 +1,58 @@
+[
+  {
+    "name": "文件系统测试套件",
+    "command": "AT+QFLST",
+    "expected_response": "OK",
+    "timeout": 5.0,
+    "priority": 1
+  },
+  {
+    "name": "列出文件",
+    "command": "AT+QFLST",
+    "expected_response": "+QFLST:",
+    "timeout": 5.0,
+    "priority": 1
+  },
+  {
+    "name": "创建测试文件",
+    "command": "AT+QFOPEN=\"test.txt\",2",
+    "expected_response": "+QFOPEN:",
+    "timeout": 3.0,
+    "priority": 1
+  },
+  {
+    "name": "写入测试数据",
+    "command": "AT+QFWRITE=0,11",
+    "expected_response": "CONNECT",
+    "timeout": 3.0,
+    "priority": 1
+  },
+  {
+    "name": "读取测试数据",
+    "command": "AT+QFREAD=0,11",
+    "expected_response": "+QFREAD:",
+    "timeout": 3.0,
+    "priority": 1
+  },
+  {
+    "name": "关闭测试文件",
+    "command": "AT+QFCLOSE=0",
+    "expected_response": "OK",
+    "timeout": 2.0,
+    "priority": 1
+  },
+  {
+    "name": "删除测试文件",
+    "command": "AT+QFDEL=\"test.txt\"",
+    "expected_response": "OK",
+    "timeout": 3.0,
+    "priority": 1
+  },
+  {
+    "name": "验证文件已删除",
+    "command": "AT+QFLST",
+    "expected_response": "OK",
+    "timeout": 5.0,
+    "priority": 1
+  }
+]

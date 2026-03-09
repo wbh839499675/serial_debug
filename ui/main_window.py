@@ -38,7 +38,7 @@ from ui.camera_debug.camera_debug_page import CameraDebugPage
 from ui.device_test.device_test_page import DeviceTestPage
 from ui.gnss_test.gnss_test_page import GNSSTestPage
 
-from ui.power_analysis_page import PowerAnalysisPage
+from ui.power_analysis.power_analysis_page import PowerAnalysisPage
 from ui.oscilloscope_page import OscilloscopePage
 
 from ui.dialogs import ATCommandLibraryDialog

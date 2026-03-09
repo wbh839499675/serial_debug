@@ -1,0 +1,9 @@
+[
+  {
+    "name": "ATI",
+    "command": "ATI",
+    "expected_response": "OK",
+    "timeout": 3000,
+    "priority": 1
+  }
+]

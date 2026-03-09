@@ -450,10 +450,8 @@ class ManualTestTab(QWidget):
 
         # 等待响应
         response = ""
-        start_time = time.time()
-        timeout = 2.0  # 设置超时时间为2秒
 
-        while time.time() - start_time < timeout:
+        while True:
             if self.serial_controller.available() > 0:
                 data = self.serial_controller.read_all()
                 if data:
@@ -462,13 +460,8 @@ class ManualTestTab(QWidget):
                     if 'OK' in response or 'ERROR' in response:
                         break
             time.sleep(0.01)
-
         # 显示响应
         self.display_response(command, response)
-
-        # 解析响应
-        self.parse_response(command, response)
-
 
     def clear_command_history(self):
         """清除命令历史"""

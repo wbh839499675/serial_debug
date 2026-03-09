@@ -91,9 +91,9 @@ class ConfigTab(QWidget):
         scroll_layout.addLayout(top_layout)
 
         # 数据监控卡片
-        data_monitor_card = self.create_data_monitor_card()
-        data_monitor_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scroll_layout.addWidget(data_monitor_card, 1)
+        #data_monitor_card = self.create_data_monitor_card()
+        #data_monitor_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #scroll_layout.addWidget(data_monitor_card, 1)
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)

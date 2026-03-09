@@ -6,13 +6,12 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PyQt5.QtCore import QTimer
 from .config_tab import ConfigTab
 from .manual_test_tab import ManualTestTab
+from .auto_test_tab import AutoTestTab
+from .audio_test_tab import AudioTestTab
 from .network_test_tab import NetworkTestTab
 from .data_test_tab import DataTestTab
 from .sms_test_tab import SMSTestTab
 from .hardware_test_tab import HardwareTestTab
-from .power_test_tab import PowerTestTab
-from .auto_test_tab import MonitorTab
-from .result_tab import ResultTab
 from .test_executor import TestExecutor
 from utils.logger import Logger
 from core.serial_controller import SerialController
@@ -21,12 +20,11 @@ from core.serial_controller import SerialController
 ENABLE_CONFIG_TAB    = True      # 启用设备控制页
 ENABLE_MANUAL_TAB    = True     # 启用手动测试页
 ENABLE_AUTO_TAB      = True      # 启用自动化测试页
+ENABLE_AUDIO_TAB     = True     # 启用音频测试页
 ENABLE_NETWORK_TAB   = False      # 启用网络测试页
 ENABLE_DATA_TAB      = False      # 启用数据业务测试页
 ENABLE_SMS_TAB       = False      # 启用短信测试页
-ENABLE_HARDWARE_TAB  = True      # 启用硬件接口测试页
-ENABLE_POWER_TAB     = False      # 启用功耗测试页
-ENABLE_RESULT_TAB    = True      # 启用日志与报告页
+ENABLE_HARDWARE_TAB  = False      # 启用硬件接口测试页
 # ===========================
 
 class DeviceTestPage(QWidget):
@@ -56,31 +54,28 @@ class DeviceTestPage(QWidget):
 
         if ENABLE_CONFIG_TAB: # 启用设备控制页
             self.config_tab = ConfigTab(self)
-            self.tab_widget.addTab(self.config_tab, "设备控制页")
+            self.tab_widget.addTab(self.config_tab, "⚙️设备控制页")
         if ENABLE_MANUAL_TAB: # 启用手动测试页
             self.manual_test_tab = ManualTestTab(self)
-            self.tab_widget.addTab(self.manual_test_tab, "手动测试页")
+            self.tab_widget.addTab(self.manual_test_tab, "👆手动测试页")
         if ENABLE_AUTO_TAB: # 启用自动化测试页
-            self.auto_test_tab = MonitorTab(self)
-            self.tab_widget.addTab(self.auto_test_tab, "自动化测试页")
+            self.auto_test_tab = AutoTestTab(self)
+            self.tab_widget.addTab(self.auto_test_tab, "🤖自动测试页")
+        if ENABLE_AUDIO_TAB: # 启用音频测试页
+            self.audio_test_tab = AudioTestTab(self)
+            self.tab_widget.addTab(self.audio_test_tab, "🎵音频测试页")
         if ENABLE_NETWORK_TAB: # 启用网络测试页
             self.network_test_tab = NetworkTestTab(self)
-            self.tab_widget.addTab(self.network_test_tab, "网络测试页")
+            self.tab_widget.addTab(self.network_test_tab, "🌐网络测试页")
         if ENABLE_DATA_TAB: # 启用数据业务测试页
             self.data_test_tab = DataTestTab(self)
             self.tab_widget.addTab(self.data_test_tab, "数据业务测试页")
         if ENABLE_SMS_TAB: # 启用短信测试页
             self.sms_test_tab = SMSTestTab(self)
-            self.tab_widget.addTab(self.sms_test_tab, "短信测试页")
+            self.tab_widget.addTab(self.sms_test_tab, "💬短信测试页")
         if ENABLE_HARDWARE_TAB: # 启用硬件接口测试页
             self.hardware_test_tab = HardwareTestTab(self)
             self.tab_widget.addTab(self.hardware_test_tab, "硬件接口测试页")
-        if ENABLE_POWER_TAB: # 启用功耗测试页
-            self.power_test_tab = PowerTestTab(self)
-            self.tab_widget.addTab(self.power_test_tab, "功耗测试页")
-        if ENABLE_RESULT_TAB: # 启用日志与报告页
-            self.result_tab = ResultTab(self)
-            self.tab_widget.addTab(self.result_tab, "日志与报告页")
 
         layout.addWidget(self.tab_widget)
 
@@ -105,29 +100,45 @@ class DeviceTestPage(QWidget):
 
     def start_test(self):
         """开始测试"""
-        if not self.manual_test_tab.current_script:
-            Logger.warning("请先加载测试脚本", module='device_test')
+        # 检查是否已有测试在运行
+        if self.test_executor and self.test_executor.isRunning():
+            CustomMessageBox("警告", "测试正在运行中，请先停止当前测试", "warning", self).exec_()
             return
 
-        if not self.config_tab.serial_controller.is_connected():
-            Logger.warning("请先连接串口", module='device_test')
+        if not self.serial_controller or not self.serial_controller.is_connected():
+            CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
 
-        self.test_running = True
-        self.test_executor = TestExecutor(
-            self.config_tab.serial_controller,
-            self.manual_test_tab.current_script,
-            self.manual_test_tab.loop_count
-        )
+        if not self.test_cases:
+            CustomMessageBox("警告", "请先添加测试用例", "warning", self).exec_()
+            return
+
+        # 创建测试执行器
+        self.test_executor = TestExecutor(self.serial_controller)
+        self.test_executor.set_test_cases(self.test_cases)
+        self.test_executor.set_loop_count(self.loop_spin.value())
+        self.test_executor.set_command_delay(self.delay_spin.value() / 1000.0)
 
         # 连接信号
         self.test_executor.test_started.connect(self.on_test_started)
         self.test_executor.test_finished.connect(self.on_test_finished)
-        self.test_executor.test_progress.connect(self.update_progress)
+        self.test_executor.test_progress.connect(self.on_test_progress)
         self.test_executor.case_finished.connect(self.on_case_finished)
+        self.test_executor.log_message.connect(self.on_log_message)
 
+        # 更新UI状态
+        self.start_btn.setEnabled(False)
+        self.pause_btn.setEnabled(True)
+        self.stop_btn.setEnabled(True)
+        self.status_label.setText("状态: 运行中")
+
+        # 清空结果
+        self.test_results = []
+        self.log_text.clear()
+
+        # 开始测试
         self.test_executor.start()
-        Logger.info("测试已开始", module='device_test')
+        Logger.info("测试已开始", module='auto_test')
 
     def pause_test(self):
         """暂停测试"""

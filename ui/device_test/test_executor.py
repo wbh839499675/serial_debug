@@ -139,5 +139,6 @@ class TestExecutor(QThread):
 
     def stop(self):
         """停止测试"""
-        self.running = False
-        Logger.info("测试已停止", module='auto_test')
+        self.is_running = False
+        self.is_paused = False  # 如果处于暂停状态，也要恢复
+
