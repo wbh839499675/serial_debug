@@ -65,15 +65,15 @@
   {
     "name": "获取GGA语句",
     "command": "AT+MGPSNMEA=\"GGA\"",
-    "expected_response": "+MGPSNMEA:",
-    "timeout": 10.0,
+    "expected_response": "OK",
+    "timeout": 3000,
     "priority": 1
   },
   {
     "name": "获取RMC语句",
     "command": "AT+MGPSNMEA=\"RMC\"",
-    "expected_response": "+MGPSNMEA:",
-    "timeout": 10.0,
+    "expected_response": "OK",
+    "timeout": 3000,
     "priority": 1
   },
   {

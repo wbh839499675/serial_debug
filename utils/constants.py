@@ -2489,13 +2489,6 @@ UI_SERIAL_DEBUG = {
     'CONNECT_BTN_HEIGHT': 32,               # 连接按钮高度（像素）
 }
 
-# 继电器控制命令
-RELAY_COMMANDS = {
-    'OFF': bytes.fromhex("A00101A2"),
-    'ON': bytes.fromhex("A00100A1"),
-    'STATUS': bytes.fromhex("A00103A4")
-}
-
 # 日志级别
 LOG_LEVELS = {
     'DEBUG': '#666666',

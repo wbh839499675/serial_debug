@@ -29,7 +29,7 @@ from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QBrush, QIcon, QTextCursor
 from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
-from core.relay_controller import RelayController
+from core.relay_controller import RelayController, RelayMonitorThread
 from core.device_monitor import DeviceMonitor
 from core.tester import SerialTester
 
@@ -131,8 +131,15 @@ class MainWindow(QMainWindow):
         self.last_update_time = None
         self._last_command_count = 0
 
-        # 初始化继电器串口列表（仅用于控制页面）
-        self.refresh_relay_ports()
+        # 继电器监控相关
+        self.relay_monitor_thread = None
+        self.relay_device_id = "HID\\VID_5131&PID_2007"
+
+        # 启动继电器监控线程
+        self.start_relay_monitor()
+
+        # 连接继电器状态变化信号
+        self.relay_controller.status_changed.connect(self.on_power_status_changed)
 
         # 设置定时器
         self.status_timer = QTimer()
@@ -331,6 +338,7 @@ class MainWindow(QMainWindow):
         """)
 
         # 状态栏标签
+        self.power_status_label = QLabel("🔋 设备电源: --")
         self.relay_status_label = QLabel("⚡ 继电器: 未连接")
         self.memory_status_label = QLabel("💾 内存: --")
         self.cpu_status_label = QLabel("⚡ CPU: --")
@@ -339,6 +347,10 @@ class MainWindow(QMainWindow):
         # 添加分隔符
         separator = QLabel("|")
         separator.setStyleSheet("color: #dcdfe6; padding: 0 5px;")
+
+        # 添加标签到状态栏
+        self.status_bar.addPermanentWidget(self.power_status_label)
+        self.status_bar.addPermanentWidget(separator)
         self.status_bar.addPermanentWidget(self.relay_status_label)
         self.status_bar.addPermanentWidget(separator)
         self.status_bar.addPermanentWidget(self.memory_status_label)
@@ -390,15 +402,6 @@ class MainWindow(QMainWindow):
                 display_text = f"{port.device} - {port.description}"
                 self.port_combo.addItem(display_text, port.device)
 
-    def refresh_relay_ports(self):
-        """刷新继电器串口列表"""
-        if hasattr(self, 'relay_port_combo') and self.relay_port_combo:
-            self.relay_port_combo.clear()
-            ports = serial.tools.list_ports.comports()
-            for port in ports:
-                display_text = f"{port.device} - {port.description}"
-                self.relay_port_combo.addItem(display_text, port.device)
-
     def toggle_serial(self):
         """打开/关闭串口"""
         if not self.serial_is_open:
@@ -434,33 +437,6 @@ class MainWindow(QMainWindow):
 
         self.update_status()
 
-    # ====== 继电器相关方法 ======
-    def toggle_relay_serial(self):
-        """打开/关闭继电器串口"""
-        if not self.relay_controller.is_open:
-            success, message = self.relay_controller.open_port(self.relay_port_combo.currentData())
-            if success:
-                self.relay_serial_btn.setText("🔌 断开继电器")
-                self.relay_port_combo.setEnabled(False)
-                self.relay_status_indicator.setStyleSheet("color: #67c23a; font-size: 24pt;")
-                self.relay_on_btn.setEnabled(True)
-                self.relay_off_btn.setEnabled(True)
-            else:
-                QMessageBox.critical(self, "错误", message)
-        else:
-            success, message = self.relay_controller.close_port()
-            if success:
-                self.relay_serial_btn.setText("🔌 连接继电器")
-                self.relay_port_combo.setEnabled(True)
-                self.relay_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 24pt;")
-                self.relay_on_btn.setEnabled(False)
-                self.relay_off_btn.setEnabled(False)
-            else:
-                QMessageBox.critical(self, "错误", message)
-
-        Logger.log(message, "INFO", self.log_text)
-        self.update_status()
-
     def turn_on_relay(self):
         """打开继电器"""
         if not self.relay_controller.is_open:
@@ -488,6 +464,56 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "警告", message)
 
         self.update_status()
+
+    def start_relay_monitor(self):
+        """启动继电器监控线程"""
+        if not self.relay_monitor_thread or not self.relay_monitor_thread.isRunning():
+            success, message = self.relay_controller.start_monitor(self.relay_device_id)
+            if success:
+                self.relay_monitor_thread = self.relay_controller.monitor_thread
+                self.relay_monitor_thread.status_changed.connect(self.on_relay_status_changed)
+
+    def stop_relay_monitor(self):
+        """停止继电器监控线程"""
+        if self.relay_monitor_thread and self.relay_monitor_thread.isRunning():
+            success, message = self.relay_controller.stop_monitor()
+            if success:
+                self.relay_monitor_thread = None
+                Logger.log(message, "INFO", self.log_text)
+            else:
+                Logger.log(message, "ERROR", self.log_text)
+
+    def on_relay_status_changed(self, connected):
+        """处理继电器监控状态变化
+
+        Args:
+            connected: 继电器是否连接
+        """
+        if connected:
+            self.relay_status_label.setText("⚡ 继电器: 已连接")
+            self.relay_status_label.setStyleSheet("color: #67c23a; font-size: 9pt;")
+            Logger.log("继电器已连接", "SUCCESS", self.log_text)
+            Logger.log("继电器已连接", "SUCCESS")
+        else:
+            self.relay_status_label.setText("⚡ 继电器: 未连接")
+            self.relay_status_label.setStyleSheet("color: #f56c6c; font-size: 9pt;")
+            Logger.log("继电器已断开", "WARNING", self.log_text)
+            Logger.log("继电器已断开", "WARNING")
+
+    def on_power_status_changed(self, status):
+        """处理设备电源状态变化
+
+        Args:
+            status: 电源状态 ("POWER_ON" 或 "POWER_OFF")
+        """
+        if status == "POWER_ON":
+            self.power_status_label.setText("🔋 设备电源: 通电")
+            self.power_status_label.setStyleSheet("color: #67c23a; font-size: 9pt;")
+            Logger.log("设备电源状态: 通电", "INFO", self.log_text)
+        else:
+            self.power_status_label.setText("🔋 设备电源: 断电")
+            self.power_status_label.setStyleSheet("color: #909399; font-size: 9pt;")
+            Logger.log("设备电源状态: 断电", "INFO", self.log_text)
 
     # ====== 设备初始化 ======
     def initialize_device(self):
@@ -1032,13 +1058,6 @@ class MainWindow(QMainWindow):
     # ====== 状态栏更新 ======
     def update_status(self):
         """更新状态栏"""
-        # 继电器状态
-        if self.relay_controller.is_open:
-            state = self.relay_controller.current_state or "未知"
-            state_text = "🔋 开启" if state == 'ON' else "🔌 关闭"
-            self.relay_status_label.setText(f"⚡ 继电器: {state_text}")
-        else:
-            self.relay_status_label.setText("⚡ 继电器: 未连接")
 
         # 系统资源
         memory = psutil.virtual_memory()
@@ -1344,6 +1363,13 @@ class MainWindow(QMainWindow):
                     self.device_monitor.terminate()
                     self.device_monitor.wait(2000)
                 self.device_monitor = None
+
+            # 停止继电器监控线程
+            if hasattr(self, 'relay_monitor_thread') and self.relay_monitor_thread:
+                try:
+                    self.stop_relay_monitor()
+                except Exception as e:
+                    Logger.log(f"停止继电器监控线程失败: {str(e)}", "ERROR", self.log_text)
 
             # 3. 再停止测试线程
             if self.test_thread and self.test_thread.isRunning():

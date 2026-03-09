@@ -242,6 +242,9 @@ class AutoTestTab(QWidget):
 
         layout.addWidget(splitter)
 
+        # 设置右键菜单
+        self.setup_context_menu()
+
     def create_case_management_panel(self):
         """创建测试用例管理面板"""
         panel = QWidget()
@@ -889,37 +892,41 @@ class AutoTestTab(QWidget):
         dialog.exec_()
 
     def delete_test_case(self):
-        """删除测试用例"""
+        """删除测试用例或测试用例文件"""
         # 获取当前选中的项目
         index = self.case_tree.currentIndex()
         if not index.isValid():
-            CustomMessageBox("提示", "请先选择一个测试用例", "info", self).exec_()
+            CustomMessageBox("提示", "请先选择一个测试用例或测试用例文件", "info", self).exec_()
             return
 
         item = self.case_model.itemFromIndex(index)
-        if not item or item.parent() is None:  # 没有选中或选中了文件节点
-            CustomMessageBox("提示", "请选择一个测试用例（非文件节点）", "info", self).exec_()
+        if not item:
+            CustomMessageBox("提示", "未选择任何项目", "info", self).exec_()
             return
 
-        # 获取测试用例名称
-        case_name = item.text()
-        parent_item = item.parent()
-        source_file = parent_item.text() if parent_item else None
+        # 判断是文件节点还是测试用例节点
+        if item.parent() is None:  # 文件节点
+            self.delete_test_file()
+        else:  # 测试用例节点
+            # 获取测试用例名称
+            case_name = item.text()
+            parent_item = item.parent()
+            source_file = parent_item.text() if parent_item else None
 
-        # 确认删除
-        reply = CustomMessageBox(
-            "确认删除",
-            f"确定要删除测试用例 '{case_name}' 吗？",
-            "question",
-            self
-        ).exec_()
+            # 确认删除
+            reply = CustomMessageBox(
+                "确认删除",
+                f"确定要删除测试用例 '{case_name}' 吗？",
+                "question",
+                self
+            ).exec_()
 
-        if reply == QDialogButtonBox.Yes:
-            # 从测试用例列表中移除
-            self.test_cases = [c for c in self.test_cases if c.name != case_name]
-            # 更新测试用例树
-            self.update_case_tree()
-            Logger.info(f"已删除测试用例: {case_name}", module='auto_test')
+            if reply == QDialogButtonBox.Yes:
+                # 从测试用例列表中移除
+                self.test_cases = [c for c in self.test_cases if c.name != case_name]
+                # 更新测试用例树
+                self.update_case_tree()
+                Logger.info(f"已删除测试用例: {case_name}", module='auto_test')
 
     def update_case_tree(self):
         """更新测试用例树"""
@@ -988,6 +995,47 @@ class AutoTestTab(QWidget):
             if file_item.text() in self.expanded_files:
                 index = self.case_model.indexFromItem(file_item)
                 self.case_tree.expand(index)
+
+    def delete_test_file(self):
+        """删除测试用例文件及其所有测试用例"""
+        # 获取当前选中的项目
+        index = self.case_tree.currentIndex()
+        if not index.isValid():
+            CustomMessageBox("提示", "请先选择一个测试用例文件", "info", self).exec_()
+            return
+
+        item = self.case_model.itemFromIndex(index)
+        if not item or item.parent() is not None:  # 选中了测试用例节点而非文件节点
+            CustomMessageBox("提示", "请选择一个测试用例文件（非测试用例节点）", "info", self).exec_()
+            return
+
+        # 获取文件名
+        file_name = item.text()
+
+        # 确认删除
+        reply = CustomMessageBox(
+            "确认删除",
+            f"确定要删除测试用例文件 '{file_name}' 及其所有测试用例吗？",
+            "question",
+            self
+        ).exec_()
+
+        if reply == QDialogButtonBox.Yes:
+            # 从测试用例列表中移除该文件下的所有测试用例
+            self.test_cases = [c for c in self.test_cases if c.source_file != file_name]
+
+            # 从展开文件集合中移除
+            if file_name in self.expanded_files:
+                self.expanded_files.remove(file_name)
+
+            # 清除当前选择
+            self.case_tree.clearSelection()
+
+            # 更新测试用例树
+            self.update_case_tree()
+
+            # 记录日志
+            Logger.info(f"已删除测试用例文件: {file_name}", module='auto_test')
 
     def on_serial_connected(self, connected):
         """串口连接状态变化处理"""
@@ -1198,6 +1246,33 @@ class AutoTestTab(QWidget):
         status_item = self.case_model.item(file_item.row(), 1)
         status_item.setText(f"({passed_count}/{total_count} 通过)")
 
+    def setup_context_menu(self):
+        """设置右键菜单"""
+        self.case_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.case_tree.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, position):
+        """显示右键菜单"""
+        index = self.case_tree.indexAt(position)
+        if not index.isValid():
+            return
+
+        item = self.case_model.itemFromIndex(index)
+        if not item:
+            return
+
+        menu = QMenu(self)
+
+        if item.parent() is None:  # 文件节点
+            delete_file_action = QAction("删除测试用例文件", self)
+            delete_file_action.triggered.connect(self.delete_test_file)
+            menu.addAction(delete_file_action)
+        else:  # 测试用例节点
+            delete_case_action = QAction("删除测试用例", self)
+            delete_case_action.triggered.connect(self.delete_test_case)
+            menu.addAction(delete_case_action)
+
+        menu.exec_(self.case_tree.viewport().mapToGlobal(position))
 
     def on_log_message(self, message, level):
         """处理日志消息"""

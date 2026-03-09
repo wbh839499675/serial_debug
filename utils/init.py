@@ -4,7 +4,6 @@
 """
 from .logger import Logger
 from .constants import (
-    RELAY_COMMANDS,
     LOG_LEVELS,
     AT_READY_RESPONSES,
     CAT1_AT_COMMANDS,
@@ -16,7 +15,6 @@ from .helpers import degrees_to_dms, find_available_ports
 
 __all__ = [
     'Logger',
-    'RELAY_COMMANDS',
     'LOG_LEVELS',
     'AT_READY_RESPONSES',
     'CAT1_AT_COMMANDS',

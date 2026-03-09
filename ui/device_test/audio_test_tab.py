@@ -1524,7 +1524,7 @@ class AudioTestTab(QWidget):
         """
         # 更新模块型号显示
         self.model_label.setText("SLM332YC")
-        self.append_log.emit(f"模块型号已同步为: {model_name}", "INFO")
+        self.log_signal.emit(f"模块型号已同步为: {model_name}", "INFO")
 
     def init_connections(self):
         """初始化信号连接"""
@@ -1587,7 +1587,7 @@ class AudioTestTab(QWidget):
             self.serial_status_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #67c23a;")
             self.module_status_label.setText("模块: 在线")
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
-            self.append_log.emit("串口已连接", "INFO")
+            self.log_signal.emit("串口已连接", "INFO")
 
             # 自动刷新模块信息
             self.refresh_module_info()
@@ -1596,7 +1596,7 @@ class AudioTestTab(QWidget):
             self.serial_status_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #f56c6c;")
             self.module_status_label.setText("模块: 离线")
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-            self.append_log.emit("串口已断开", "INFO")
+            self.log_signal.emit("串口已断开", "INFO")
 
     def on_serial_disconnected(self, disconnected):
         """串口断开状态变化处理"""
@@ -1605,25 +1605,25 @@ class AudioTestTab(QWidget):
             self.serial_status_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #f56c6c;")
             self.module_status_label.setText("模块: 离线")
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-            self.append_log.emit("串口已断开", "INFO")
+            self.log_signal.emit("串口已断开", "INFO")
 
     def initialize_audio(self):
         """初始化音频功能"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法初始化音频功能", "ERROR")
+            self.log_signal.emit("串口未连接，无法初始化音频功能", "ERROR")
             return
         
         try:
             # 发送初始化命令
             self.serial_controller.write("AT+QAUDCH?")
             response = self.serial_controller.read_response()
-            self.append_log.emit(f"TX: AT+QAUDCH?", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f"TX: AT+QAUDCH?", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
-            self.append_log.emit("音频功能初始化成功", "INFO")
+            self.log_signal.emit("音频功能初始化成功", "INFO")
         except Exception as e:
-            self.append_log.emit(f"初始化音频功能失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"初始化音频功能失败: {str(e)}", "ERROR")
     
     def on_volume_changed(self, value):
         """音量变化处理"""
@@ -1649,7 +1649,7 @@ class AudioTestTab(QWidget):
     def apply_audio_settings(self):
         """应用音频设置"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法应用音频设置", "ERROR")
+            self.log_signal.emit("串口未连接，无法应用音频设置", "ERROR")
             return
         
         try:
@@ -1660,54 +1660,54 @@ class AudioTestTab(QWidget):
             # 发送音频通道设置命令
             self.serial_controller.write(f"AT+QAUDCH={channel}")
             response = self.serial_controller.read_response()
-            self.append_log.emit(f"TX: AT+QAUDCH={channel}", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f"TX: AT+QAUDCH={channel}", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.current_channel = channel
             self.channel_status_label.setText(f"音频通道: {channel_name}")
-            self.append_log.emit(f"音频通道已设置为: {channel_name}", "INFO")
+            self.log_signal.emit(f"音频通道已设置为: {channel_name}", "INFO")
             
             # 发送音量设置命令
             volume = self.volume_slider.value()
             self.serial_controller.write(f"AT+QAUDVOL={channel},{volume}")
             response = self.serial_controller.read_response()
-            self.append_log.emit(f"TX: AT+QAUDVOL={channel},{volume}", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f"TX: AT+QAUDVOL={channel},{volume}", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.current_volume = volume
-            self.append_log.emit(f"音量已设置为: {volume}", "INFO")
+            self.log_signal.emit(f"音量已设置为: {volume}", "INFO")
             
             # 发送麦克风增益设置命令
             mic_gain = self.mic_gain_slider.value()
             self.serial_controller.write(f"AT+QMIC={channel},{mic_gain}")
             response = self.serial_controller.read_response()
-            self.append_log.emit(f"TX: AT+QMIC={channel},{mic_gain}", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f"TX: AT+QMIC={channel},{mic_gain}", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.mic_gain = mic_gain
-            self.append_log.emit(f"麦克风增益已设置为: {mic_gain}", "INFO")
+            self.log_signal.emit(f"麦克风增益已设置为: {mic_gain}", "INFO")
             
             # 发送侧音设置命令
             if self.sidetone_check.isChecked():
                 sidetone_gain = self.sidetone_gain_slider.value()
                 self.serial_controller.write(f"AT+QSIDET={sidetone_gain}")
                 response = self.serial_controller.read_response()
-                self.append_log.emit(f"TX: AT+QSIDET={sidetone_gain}", "TX")
-                self.append_log.emit(f"RX: {response}", "RX")
-                self.append_log.emit(f"侧音已启用，增益设置为: {sidetone_gain}", "INFO")
+                self.log_signal.emit(f"TX: AT+QSIDET={sidetone_gain}", "TX")
+                self.log_signal.emit(f"RX: {response}", "RX")
+                self.log_signal.emit(f"侧音已启用，增益设置为: {sidetone_gain}", "INFO")
             else:
                 self.serial_controller.write("AT+QSIDET=0")
                 response = self.serial_controller.read_response()
-                self.append_log.emit(f"TX: AT+QSIDET=0", "TX")
-                self.append_log.emit(f"RX: {response}", "RX")
-                self.append_log.emit("侧音已关闭", "INFO")
+                self.log_signal.emit(f"TX: AT+QSIDET=0", "TX")
+                self.log_signal.emit(f"RX: {response}", "RX")
+                self.log_signal.emit("侧音已关闭", "INFO")
             
-            self.append_log.emit("音频设置已应用", "INFO")
+            self.log_signal.emit("音频设置已应用", "INFO")
         except Exception as e:
-            self.append_log.emit(f"应用音频设置失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"应用音频设置失败: {str(e)}", "ERROR")
     
     def browse_recording_file(self):
         """浏览录音文件"""
@@ -1720,7 +1720,7 @@ class AudioTestTab(QWidget):
     def start_recording(self):
         """开始录音"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法开始录音", "ERROR")
+            self.log_signal.emit("串口未连接，无法开始录音", "ERROR")
             return
         
         try:
@@ -1732,8 +1732,8 @@ class AudioTestTab(QWidget):
             # 发送录音命令
             self.serial_controller.write(f'AT+QAUDREC="{filename}",{duration}')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QAUDREC="{filename}",{duration}', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QAUDREC="{filename}",{duration}', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.is_recording = True
@@ -1748,22 +1748,22 @@ class AudioTestTab(QWidget):
             self.recording_time = 0
             self.recording_timer.start(1000)
             
-            self.append_log.emit(f"开始录音，文件: {filename}，时长: {duration}秒", "INFO")
+            self.log_signal.emit(f"开始录音，文件: {filename}，时长: {duration}秒", "INFO")
         except Exception as e:
-            self.append_log.emit(f"开始录音失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"开始录音失败: {str(e)}", "ERROR")
     
     def stop_recording(self):
         """停止录音"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法停止录音", "ERROR")
+            self.log_signal.emit("串口未连接，无法停止录音", "ERROR")
             return
         
         try:
             # 发送停止录音命令
             self.serial_controller.write("AT+QAUDREC=0")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QAUDREC=0", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QAUDREC=0", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.is_recording = False
@@ -1777,12 +1777,12 @@ class AudioTestTab(QWidget):
             # 停止录音定时器
             self.recording_timer.stop()
             
-            self.append_log.emit("录音已停止", "INFO")
+            self.log_signal.emit("录音已停止", "INFO")
             
             # 刷新文件列表
             self.refresh_audio_files()
         except Exception as e:
-            self.append_log.emit(f"停止录音失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"停止录音失败: {str(e)}", "ERROR")
     
     def update_recording_status(self):
         """更新录音状态"""
@@ -1807,15 +1807,15 @@ class AudioTestTab(QWidget):
     def refresh_audio_files(self):
         """刷新音频文件列表"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法刷新文件列表", "ERROR")
+            self.log_signal.emit("串口未连接，无法刷新文件列表", "ERROR")
             return
         
         try:
             # 发送查询文件列表命令
             self.serial_controller.write("AT+QLFS")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QLFS", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QLFS", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 解析响应并更新文件列表
             # 这里需要根据实际响应格式进行解析
@@ -1839,9 +1839,9 @@ class AudioTestTab(QWidget):
             for file in self.audio_files:
                 self.playback_file_combo.addItem(file["name"])
             
-            self.append_log.emit("文件列表已刷新", "INFO")
+            self.log_signal.emit("文件列表已刷新", "INFO")
         except Exception as e:
-            self.append_log.emit(f"刷新文件列表失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"刷新文件列表失败: {str(e)}", "ERROR")
     
     def create_table_item(self, text):
         """创建表格项"""
@@ -1853,21 +1853,21 @@ class AudioTestTab(QWidget):
     def play_audio(self):
         """播放音频文件"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法播放音频", "ERROR")
+            self.log_signal.emit("串口未连接，无法播放音频", "ERROR")
             return
         
         try:
             # 获取选中的文件
             filename = self.playback_file_combo.currentText()
             if not filename:
-                self.append_log.emit("请选择要播放的文件", "WARNING")
+                self.log_signal.emit("请选择要播放的文件", "WARNING")
                 return
             
             # 发送播放命令
             self.serial_controller.write(f'AT+QAUDPLAY="{filename}"')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.is_playing = True
@@ -1884,22 +1884,22 @@ class AudioTestTab(QWidget):
             self.playback_time = 0
             self.playing_timer.start(1000)
             
-            self.append_log.emit(f"开始播放音频: {filename}", "INFO")
+            self.log_signal.emit(f"开始播放音频: {filename}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"播放音频失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"播放音频失败: {str(e)}", "ERROR")
     
     def pause_audio(self):
         """暂停播放"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法暂停播放", "ERROR")
+            self.log_signal.emit("串口未连接，无法暂停播放", "ERROR")
             return
         
         try:
             # 发送暂停播放命令
             self.serial_controller.write("AT+QAUDPLAY=0")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QAUDPLAY=0", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QAUDPLAY=0", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.playback_status_label.setText("状态: 已暂停")
@@ -1914,22 +1914,22 @@ class AudioTestTab(QWidget):
             # 停止播放定时器
             self.playing_timer.stop()
             
-            self.append_log.emit("播放已暂停", "INFO")
+            self.log_signal.emit("播放已暂停", "INFO")
         except Exception as e:
-            self.append_log.emit(f"暂停播放失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"暂停播放失败: {str(e)}", "ERROR")
     
     def resume_audio(self):
         """恢复播放"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法恢复播放", "ERROR")
+            self.log_signal.emit("串口未连接，无法恢复播放", "ERROR")
             return
         
         try:
             # 发送恢复播放命令
             self.serial_controller.write("AT+QAUDPLAY=1")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QAUDPLAY=1", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QAUDPLAY=1", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.playback_status_label.setText("状态: 播放中")
@@ -1944,22 +1944,22 @@ class AudioTestTab(QWidget):
             # 启动播放定时器
             self.playing_timer.start(1000)
             
-            self.append_log.emit("播放已恢复", "INFO")
+            self.log_signal.emit("播放已恢复", "INFO")
         except Exception as e:
-            self.append_log.emit(f"恢复播放失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"恢复播放失败: {str(e)}", "ERROR")
     
     def stop_audio(self):
         """停止播放"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法停止播放", "ERROR")
+            self.log_signal.emit("串口未连接，无法停止播放", "ERROR")
             return
         
         try:
             # 发送停止播放命令
             self.serial_controller.write("AT+QAUDPLAY=2")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QAUDPLAY=2", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QAUDPLAY=2", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.is_playing = False
@@ -1975,9 +1975,9 @@ class AudioTestTab(QWidget):
             # 停止播放定时器
             self.playing_timer.stop()
             
-            self.append_log.emit("播放已停止", "INFO")
+            self.log_signal.emit("播放已停止", "INFO")
         except Exception as e:
-            self.append_log.emit(f"停止播放失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"停止播放失败: {str(e)}", "ERROR")
     
     def update_playback_status(self):
         """更新播放状态"""
@@ -1993,12 +1993,12 @@ class AudioTestTab(QWidget):
             # 如果播放完成
             if self.playback_time >= total_time:
                 self.stop_audio()
-                self.append_log.emit("播放完成", "INFO")
+                self.log_signal.emit("播放完成", "INFO")
     
     def upload_file(self):
         """上传文件"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法上传文件", "ERROR")
+            self.log_signal.emit("串口未连接，无法上传文件", "ERROR")
             return
         
         try:
@@ -2014,32 +2014,32 @@ class AudioTestTab(QWidget):
             
             # 这里应该实现Ymodem/Zmodem协议上传文件
             # 示例代码，实际实现需要使用相应的协议库
-            self.append_log.emit(f"开始上传文件: {filename}", "INFO")
+            self.log_signal.emit(f"开始上传文件: {filename}", "INFO")
             
             # 模拟上传过程
             import time
             for i in range(1, 101):
                 time.sleep(0.05)
-                self.append_log.emit(f"上传进度: {i}%", "INFO")
+                self.log_signal.emit(f"上传进度: {i}%", "INFO")
             
-            self.append_log.emit(f"文件上传完成: {filename}", "INFO")
+            self.log_signal.emit(f"文件上传完成: {filename}", "INFO")
             
             # 刷新文件列表
             self.refresh_audio_files()
         except Exception as e:
-            self.append_log.emit(f"上传文件失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"上传文件失败: {str(e)}", "ERROR")
     
     def download_file(self):
         """下载文件"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法下载文件", "ERROR")
+            self.log_signal.emit("串口未连接，无法下载文件", "ERROR")
             return
         
         try:
             # 获取选中的文件
             selected_rows = self.file_list_table.selectionModel().selectedRows()
             if not selected_rows:
-                self.append_log.emit("请选择要下载的文件", "WARNING")
+                self.log_signal.emit("请选择要下载的文件", "WARNING")
                 return
             
             row = selected_rows[0].row()
@@ -2054,29 +2054,29 @@ class AudioTestTab(QWidget):
             
             # 这里应该实现Ymodem/Zmodem协议下载文件
             # 示例代码，实际实现需要使用相应的协议库
-            self.append_log.emit(f"开始下载文件: {filename}", "INFO")
+            self.log_signal.emit(f"开始下载文件: {filename}", "INFO")
             
             # 模拟下载过程
             import time
             for i in range(1, 101):
                 time.sleep(0.05)
-                self.append_log.emit(f"下载进度: {i}%", "INFO")
+                self.log_signal.emit(f"下载进度: {i}%", "INFO")
             
-            self.append_log.emit(f"文件下载完成: {save_path}", "INFO")
+            self.log_signal.emit(f"文件下载完成: {save_path}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"下载文件失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"下载文件失败: {str(e)}", "ERROR")
     
     def delete_file(self):
         """删除文件"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法删除文件", "ERROR")
+            self.log_signal.emit("串口未连接，无法删除文件", "ERROR")
             return
         
         try:
             # 获取选中的文件
             selected_rows = self.file_list_table.selectionModel().selectedRows()
             if not selected_rows:
-                self.append_log.emit("请选择要删除的文件", "WARNING")
+                self.log_signal.emit("请选择要删除的文件", "WARNING")
                 return
             
             row = selected_rows[0].row()
@@ -2085,27 +2085,27 @@ class AudioTestTab(QWidget):
             # 发送删除文件命令
             self.serial_controller.write(f'AT+QFDEL="{filename}"')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QFDEL="{filename}"', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QFDEL="{filename}"', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
-            self.append_log.emit(f"文件已删除: {filename}", "INFO")
+            self.log_signal.emit(f"文件已删除: {filename}", "INFO")
             
             # 刷新文件列表
             self.refresh_audio_files()
         except Exception as e:
-            self.append_log.emit(f"删除文件失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"删除文件失败: {str(e)}", "ERROR")
     
     def rename_file(self):
         """重命名文件"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法重命名文件", "ERROR")
+            self.log_signal.emit("串口未连接，无法重命名文件", "ERROR")
             return
         
         try:
             # 获取选中的文件
             selected_rows = self.file_list_table.selectionModel().selectedRows()
             if not selected_rows:
-                self.append_log.emit("请选择要重命名的文件", "WARNING")
+                self.log_signal.emit("请选择要重命名的文件", "WARNING")
                 return
             
             row = selected_rows[0].row()
@@ -2120,27 +2120,27 @@ class AudioTestTab(QWidget):
                 # 发送重命名文件命令
                 self.serial_controller.write(f'AT+QFRENAME="{old_filename}","{new_filename}"')
                 response = self.serial_controller.read_response()
-                self.append_log.emit(f'TX: AT+QFRENAME="{old_filename}","{new_filename}"', "TX")
-                self.append_log.emit(f"RX: {response}", "RX")
+                self.log_signal.emit(f'TX: AT+QFRENAME="{old_filename}","{new_filename}"', "TX")
+                self.log_signal.emit(f"RX: {response}", "RX")
                 
-                self.append_log.emit(f"文件已重命名: {old_filename} -> {new_filename}", "INFO")
+                self.log_signal.emit(f"文件已重命名: {old_filename} -> {new_filename}", "INFO")
                 
                 # 刷新文件列表
                 self.refresh_audio_files()
         except Exception as e:
-            self.append_log.emit(f"重命名文件失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"重命名文件失败: {str(e)}", "ERROR")
     
     def play_tts(self):
         """播放TTS"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法播放TTS", "ERROR")
+            self.log_signal.emit("串口未连接，无法播放TTS", "ERROR")
             return
         
         try:
             # 获取TTS参数
             text = self.tts_text_edit.toPlainText()
             if not text:
-                self.append_log.emit("请输入要合成的文本", "WARNING")
+                self.log_signal.emit("请输入要合成的文本", "WARNING")
                 return
             
             language = self.tts_language_combo.currentText()
@@ -2150,14 +2150,14 @@ class AudioTestTab(QWidget):
             # 发送TTS配置命令
             self.serial_controller.write(f'AT+QTTS="{language}",{speed},{volume}')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QTTS="{language}",{speed},{volume}', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QTTS="{language}",{speed},{volume}', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 发送TTS播放命令
             self.serial_controller.write(f'AT+QTTSP="{text}"')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QTTSP="{text}"', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QTTSP="{text}"', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.tts_play_btn.setEnabled(False)
@@ -2165,22 +2165,22 @@ class AudioTestTab(QWidget):
             self.audio_status_label.setText("当前状态: TTS播放中")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
             
-            self.append_log.emit(f"开始播放TTS: {text}", "INFO")
+            self.log_signal.emit(f"开始播放TTS: {text}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"播放TTS失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"播放TTS失败: {str(e)}", "ERROR")
     
     def stop_tts(self):
         """停止TTS"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法停止TTS", "ERROR")
+            self.log_signal.emit("串口未连接，无法停止TTS", "ERROR")
             return
         
         try:
             # 发送停止TTS命令
             self.serial_controller.write("AT+QTTSP=0")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: AT+QTTSP=0", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: AT+QTTSP=0", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.tts_play_btn.setEnabled(True)
@@ -2188,28 +2188,28 @@ class AudioTestTab(QWidget):
             self.audio_status_label.setText("当前状态: 空闲")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
             
-            self.append_log.emit("TTS播放已停止", "INFO")
+            self.log_signal.emit("TTS播放已停止", "INFO")
         except Exception as e:
-            self.append_log.emit(f"停止TTS失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"停止TTS失败: {str(e)}", "ERROR")
     
     def dial_call(self):
         """拨打电话"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法拨打电话", "ERROR")
+            self.log_signal.emit("串口未连接，无法拨打电话", "ERROR")
             return
         
         try:
             # 获取电话号码
             phone_number = self.phone_number_edit.text()
             if not phone_number:
-                self.append_log.emit("请输入电话号码", "WARNING")
+                self.log_signal.emit("请输入电话号码", "WARNING")
                 return
             
             # 发送拨号命令
             self.serial_controller.write(f"ATD{phone_number};")
             response = self.serial_controller.read_response()
-            self.append_log.emit(f"TX: ATD{phone_number};", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f"TX: ATD{phone_number};", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.dial_btn.setEnabled(False)
@@ -2221,22 +2221,22 @@ class AudioTestTab(QWidget):
             self.audio_status_label.setText("当前状态: 呼叫中")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #e6a23c;")
             
-            self.append_log.emit(f"正在拨打电话: {phone_number}", "INFO")
+            self.log_signal.emit(f"正在拨打电话: {phone_number}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"拨打电话失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"拨打电话失败: {str(e)}", "ERROR")
     
     def hangup_call(self):
         """挂断电话"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法挂断电话", "ERROR")
+            self.log_signal.emit("串口未连接，无法挂断电话", "ERROR")
             return
         
         try:
             # 发送挂断命令
             self.serial_controller.write("ATH")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: ATH", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: ATH", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.dial_btn.setEnabled(True)
@@ -2254,22 +2254,22 @@ class AudioTestTab(QWidget):
             # 停止通话定时器
             self.call_timer.stop()
             
-            self.append_log.emit("电话已挂断", "INFO")
+            self.log_signal.emit("电话已挂断", "INFO")
         except Exception as e:
-            self.append_log.emit(f"挂断电话失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"挂断电话失败: {str(e)}", "ERROR")
     
     def answer_call(self):
         """接听电话"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法接听电话", "ERROR")
+            self.log_signal.emit("串口未连接，无法接听电话", "ERROR")
             return
         
         try:
             # 发送接听命令
             self.serial_controller.write("ATA")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: ATA", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: ATA", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.answer_btn.setEnabled(False)
@@ -2285,22 +2285,22 @@ class AudioTestTab(QWidget):
             self.call_time = 0
             self.call_timer.start(1000)
             
-            self.append_log.emit("电话已接听", "INFO")
+            self.log_signal.emit("电话已接听", "INFO")
         except Exception as e:
-            self.append_log.emit(f"接听电话失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"接听电话失败: {str(e)}", "ERROR")
     
     def reject_call(self):
         """拒接电话"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法拒接电话", "ERROR")
+            self.log_signal.emit("串口未连接，无法拒接电话", "ERROR")
             return
         
         try:
             # 发送挂断命令
             self.serial_controller.write("ATH")
             response = self.serial_controller.read_response()
-            self.append_log.emit("TX: ATH", "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit("TX: ATH", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
             # 更新UI
             self.answer_btn.setEnabled(False)
@@ -2310,9 +2310,9 @@ class AudioTestTab(QWidget):
             self.audio_status_label.setText("当前状态: 空闲")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
             
-            self.append_log.emit("电话已拒接", "INFO")
+            self.log_signal.emit("电话已拒接", "INFO")
         except Exception as e:
-            self.append_log.emit(f"拒接电话失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"拒接电话失败: {str(e)}", "ERROR")
     
     def update_call_status(self):
         """更新通话状态"""
@@ -2322,47 +2322,47 @@ class AudioTestTab(QWidget):
     def record_during_call(self):
         """通话中录音"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法通话中录音", "ERROR")
+            self.log_signal.emit("串口未连接，无法通话中录音", "ERROR")
             return
         
         try:
             # 发送通话中录音命令
             self.serial_controller.write('AT+QAUDREC="C:\\call_rec.amr",60')
             response = self.serial_controller.read_response()
-            self.append_log.emit('TX: AT+QAUDREC="C:\\call_rec.amr",60', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit('TX: AT+QAUDREC="C:\\call_rec.amr",60', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
-            self.append_log.emit("开始通话中录音", "INFO")
+            self.log_signal.emit("开始通话中录音", "INFO")
         except Exception as e:
-            self.append_log.emit(f"通话中录音失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"通话中录音失败: {str(e)}", "ERROR")
     
     def play_during_call(self):
         """通话中播放"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法通话中播放", "ERROR")
+            self.log_signal.emit("串口未连接，无法通话中播放", "ERROR")
             return
         
         try:
             # 获取选中的文件
             filename = self.playback_file_combo.currentText()
             if not filename:
-                self.append_log.emit("请选择要播放的文件", "WARNING")
+                self.log_signal.emit("请选择要播放的文件", "WARNING")
                 return
             
             # 发送通话中播放命令
             self.serial_controller.write(f'AT+QAUDPLAY="{filename}"')
             response = self.serial_controller.read_response()
-            self.append_log.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
-            self.append_log.emit(f"RX: {response}", "RX")
+            self.log_signal.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
             
-            self.append_log.emit(f"开始通话中播放: {filename}", "INFO")
+            self.log_signal.emit(f"开始通话中播放: {filename}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"通话中播放失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"通话中播放失败: {str(e)}", "ERROR")
 
     def refresh_module_info(self):
         """从模组读取模块信息"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法读取模块信息", "ERROR")
+            self.log_signal.emit("串口未连接，无法读取模块信息", "ERROR")
             return
 
         try:
@@ -2398,9 +2398,9 @@ class AudioTestTab(QWidget):
                 if imsi:
                     self.imsi_label.setText(imsi)
 
-            self.append_log.emit("模块信息已刷新", "INFO")
+            self.log_signal.emit("模块信息已刷新", "INFO")
         except Exception as e:
-            self.append_log.emit(f"读取模块信息失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"读取模块信息失败: {str(e)}", "ERROR")
 
 
     def add_test_case(self):
@@ -2416,25 +2416,25 @@ class AudioTestTab(QWidget):
             self.test_case_table.setItem(row, 1, self.create_table_item("待执行"))
             self.test_case_table.setItem(row, 2, self.create_table_item("-"))
             
-            self.append_log.emit(f"已添加测试用例: {test_name}", "INFO")
+            self.log_signal.emit(f"已添加测试用例: {test_name}", "INFO")
     
     def remove_test_case(self):
         """删除测试用例"""
         selected_rows = self.test_case_table.selectionModel().selectedRows()
         if not selected_rows:
-            self.append_log.emit("请选择要删除的测试用例", "WARNING")
+            self.log_signal.emit("请选择要删除的测试用例", "WARNING")
             return
         
         row = selected_rows[0].row()
         test_name = self.test_case_table.item(row, 0).text()
         self.test_case_table.removeRow(row)
         
-        self.append_log.emit(f"已删除测试用例: {test_name}", "INFO")
+        self.log_signal.emit(f"已删除测试用例: {test_name}", "INFO")
     
     def start_auto_test(self):
         """开始自动测试"""
         if not self.serial_controller or not self.serial_controller.is_connected():
-            self.append_log.emit("串口未连接，无法开始自动测试", "ERROR")
+            self.log_signal.emit("串口未连接，无法开始自动测试", "ERROR")
             return
         
         try:
@@ -2449,7 +2449,7 @@ class AudioTestTab(QWidget):
             # 获取测试用例数量
             test_count = self.test_case_table.rowCount()
             if test_count == 0:
-                self.append_log.emit("没有测试用例，请先添加测试用例", "WARNING")
+                self.log_signal.emit("没有测试用例，请先添加测试用例", "WARNING")
                 self.stop_auto_test()
                 return
             
@@ -2463,10 +2463,10 @@ class AudioTestTab(QWidget):
             self.loop_count = 0
             self.max_loop_count = self.loop_count_spin.value() if test_mode == "循环测试" else 1
             
-            self.append_log.emit(f"开始自动测试，模式: {test_mode}", "INFO")
+            self.log_signal.emit(f"开始自动测试，模式: {test_mode}", "INFO")
             self.execute_next_test_case()
         except Exception as e:
-            self.append_log.emit(f"开始自动测试失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"开始自动测试失败: {str(e)}", "ERROR")
             self.stop_auto_test()
     
     def pause_auto_test(self):
@@ -2475,7 +2475,7 @@ class AudioTestTab(QWidget):
         self.pause_test_btn.setEnabled(False)
         self.stop_test_btn.setEnabled(True)
         
-        self.append_log.emit("自动测试已暂停", "INFO")
+        self.log_signal.emit("自动测试已暂停", "INFO")
     
     def stop_auto_test(self):
         """停止自动测试"""
@@ -2483,7 +2483,7 @@ class AudioTestTab(QWidget):
         self.pause_test_btn.setEnabled(False)
         self.stop_test_btn.setEnabled(False)
         
-        self.append_log.emit("自动测试已停止", "INFO")
+        self.log_signal.emit("自动测试已停止", "INFO")
         
         # 生成测试报告
         self.generate_test_report()
@@ -2497,7 +2497,7 @@ class AudioTestTab(QWidget):
             if self.test_mode_combo.currentText() == "无限循环" or self.loop_count < self.max_loop_count:
                 # 开始下一轮循环
                 self.current_test_index = 0
-                self.append_log.emit(f"开始第 {self.loop_count + 1} 轮测试", "INFO")
+                self.log_signal.emit(f"开始第 {self.loop_count + 1} 轮测试", "INFO")
             else:
                 # 所有循环已完成
                 self.stop_auto_test()
@@ -2505,7 +2505,7 @@ class AudioTestTab(QWidget):
         
         # 获取当前测试用例
         test_name = self.test_case_table.item(self.current_test_index, 0).text()
-        self.append_log.emit(f"执行测试用例: {test_name}", "INFO")
+        self.log_signal.emit(f"执行测试用例: {test_name}", "INFO")
         
         # 更新测试用例状态
         self.test_case_table.setItem(self.current_test_index, 1, self.create_table_item("执行中"))
@@ -2523,12 +2523,12 @@ class AudioTestTab(QWidget):
             self.test_case_table.setItem(self.current_test_index, 1, self.create_table_item("已完成"))
             self.test_case_table.setItem(self.current_test_index, 2, self.create_table_item("通过"))
             self.test_passed += 1
-            self.append_log.emit(f"测试用例 {test_name} 执行通过", "INFO")
+            self.log_signal.emit(f"测试用例 {test_name} 执行通过", "INFO")
         else:
             self.test_case_table.setItem(self.current_test_index, 1, self.create_table_item("已完成"))
             self.test_case_table.setItem(self.current_test_index, 2, self.create_table_item("失败"))
             self.test_failed += 1
-            self.append_log.emit(f"测试用例 {test_name} 执行失败", "ERROR")
+            self.log_signal.emit(f"测试用例 {test_name} 执行失败", "ERROR")
         
         # 记录测试结果
         self.test_results.append({
@@ -2675,14 +2675,14 @@ class AudioTestTab(QWidget):
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
-            self.append_log.emit(f"测试报告已生成: {file_path}", "INFO")
+            self.log_signal.emit(f"测试报告已生成: {file_path}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"生成测试报告失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"生成测试报告失败: {str(e)}", "ERROR")
     
     def clear_log(self):
         """清空日志"""
         self.log_text.clear()
-        self.append_log.emit("日志已清空", "INFO")
+        self.log_signal.emit("日志已清空", "INFO")
     
     def save_log(self):
         """保存日志"""
@@ -2698,9 +2698,9 @@ class AudioTestTab(QWidget):
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(self.log_text.toPlainText())
             
-            self.append_log.emit(f"日志已保存: {file_path}", "INFO")
+            self.log_signal.emit(f"日志已保存: {file_path}", "INFO")
         except Exception as e:
-            self.append_log.emit(f"保存日志失败: {str(e)}", "ERROR")
+            self.log_signal.emit(f"保存日志失败: {str(e)}", "ERROR")
     
     def append_log(self, message, level="INFO"):
         """记录日志消息"""
