@@ -3,10 +3,11 @@
 """
 import json
 from typing import List, Dict
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QMimeData
+from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QScrollArea,
-    QLabel, QDialog
+    QLabel, QDialog, QApplication
 )
 from utils.logger import Logger
 
@@ -19,6 +20,89 @@ from utils.constants import (
 )
 
 from ui.serial_debug.data_sender import DataSender
+
+class DraggableCommandRow(QWidget):
+    """可拖拽的命令行组件"""
+    
+    def __init__(self, parent=None, command_manager=None):
+        super().__init__(parent)
+        self.command_manager = command_manager
+        self.setAcceptDrops(True)
+        self.drag_start_position = None
+        
+    def mousePressEvent(self, event):
+        """鼠标按下事件"""
+        if event.button() == Qt.LeftButton:
+            # 检查是否点击在命令编号标签上
+            child = self.childAt(event.pos())
+            if isinstance(child, QLabel):
+                self.drag_start_position = event.pos()
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.ignore()
+    
+    def mouseMoveEvent(self, event):
+        """鼠标移动事件"""
+        if not (event.buttons() & Qt.LeftButton):
+            return
+            
+        if not self.drag_start_position:
+            return
+            
+        if (event.pos() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
+            return
+            
+        # 开始拖拽
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        
+        # 设置拖拽数据
+        mime_data.setText(f"command_row:{self.command_manager._get_row_index(self)}")
+        drag.setMimeData(mime_data)
+        
+        # 创建拖拽时的预览图
+        pixmap = QPixmap(self.size())
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        self.render(painter)
+        painter.end()
+        
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(event.pos())
+        
+        # 执行拖拽
+        drag.exec_(Qt.MoveAction)
+    
+    def dragEnterEvent(self, event):
+        """拖拽进入事件"""
+        if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+    
+    def dragMoveEvent(self, event):
+        """拖拽移动事件"""
+        if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+    
+    def dropEvent(self, event):
+        """放下事件"""
+        if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
+            # 获取源行索引
+            source_index = int(event.mimeData().text().split(":")[1])
+            target_index = self.command_manager._get_row_index(self)
+            
+            # 交换命令行位置
+            if source_index != target_index:
+                self.command_manager._swap_command_rows(source_index, target_index)
+            
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
 class CommandManager(QObject):
     """命令管理类"""
@@ -91,7 +175,7 @@ class CommandManager(QObject):
             return
 
         # 创建命令行容器
-        row_widget = QWidget()
+        row_widget = DraggableCommandRow(parent=None, command_manager=self)
         row_widget.setFixedHeight(UI_SERIAL_DEBUG['ROW_HEIGHT'])  # 设置固定高度
         row_widget.setStyleSheet("""
             QWidget {
@@ -106,8 +190,10 @@ class CommandManager(QObject):
 
         # 命令编号
         row_number = QLabel(f"{self.command_rows + 1}.")
-        row_number.setStyleSheet(get_page_label_style('serial_debug', 'row_number'))
+        row_number.setStyleSheet(get_page_label_style('serial_debug', 'row_number') +
+                         "QLabel { cursor: grab; }")
         row_number.setFixedWidth(18)
+        row_number.setToolTip("拖拽可调整命令顺序")
         row_layout.addWidget(row_number)
 
         # 命令编辑框
@@ -205,6 +291,7 @@ class CommandManager(QObject):
                 row_number = widget.findChild(QLabel)
                 if row_number:
                     row_number.setText(f"{i + 1}.")
+
     def _renumber_commands(self) -> None:
         """重新编号所有命令"""
         if not self.commands_layout:
@@ -233,7 +320,6 @@ class CommandManager(QObject):
         self.commands = new_commands
         self.command_rows = len(new_commands)
 
-
     def clear_commands(self) -> None:
         """清空所有命令"""
         # 清空列表
@@ -255,6 +341,36 @@ class CommandManager(QObject):
             return {}
 
         return self.commands[index]
+
+    def _get_row_index(self, row_widget) -> int:
+        """获取命令行在布局中的索引"""
+        for i in range(self.commands_layout.count() - 1):
+            if self.commands_layout.itemAt(i).widget() == row_widget:
+                return i
+        return -1
+
+    def _swap_command_rows(self, source_index: int, target_index: int) -> None:
+        """交换两个命令行的位置"""
+        if source_index < 0 or target_index < 0 or source_index >= self.command_rows or target_index >= self.command_rows:
+            return
+
+        # 获取两个widget
+        source_widget = self.commands_layout.itemAt(source_index).widget()
+        target_widget = self.commands_layout.itemAt(target_index).widget()
+
+        if not source_widget or not target_widget:
+            return
+
+        # 临时保存源widget
+        source_layout_item = self.commands_layout.takeAt(source_index)
+
+        # 将源widget插入到目标位置
+        self.commands_layout.insertWidget(target_index, source_widget)
+
+        # 重新编号
+        self._renumber_commands()
+
+        Logger.log(f"已交换命令行位置: {source_index + 1} <-> {target_index + 1}", "INFO")
 
     def import_commands(self, file_path: str) -> bool:
         """导入命令列表"""
