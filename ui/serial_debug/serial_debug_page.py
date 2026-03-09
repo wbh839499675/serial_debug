@@ -20,6 +20,7 @@ from utils.constants import (
 )
 
 from ui.dialogs import CustomMessageBox
+from datetime import datetime
 
 # 导入布局模块
 from ui.serial_debug.serial_debug_layout import (

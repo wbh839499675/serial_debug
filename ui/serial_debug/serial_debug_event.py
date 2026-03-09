@@ -7,6 +7,9 @@ from datetime import datetime
 from ui.dialogs import CustomMessageBox, SerialConfigDialog, FileSendDialog
 from utils.logger import Logger
 import serial
+from PyQt5.QtWidgets import (
+    QDialog
+)
 
 from utils.constants import (
     get_page_button_style,

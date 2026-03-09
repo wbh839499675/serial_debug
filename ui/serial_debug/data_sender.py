@@ -113,24 +113,40 @@ class DataSender(QObject):
         if self.is_timer_sending:
             self.send_data()
 
-    def send_data(self) -> None:
-        """发送数据"""
+    def send_data(self, data: str = None) -> None:
+        """发送数据
+
+        Args:
+            data: 要发送的数据，如果为None则从send_edit获取
+        """
         if not self.serial_manager or not self.serial_manager.is_connected:
             return
         try:
-            # 获取发送数据
-            data = self._get_send_data()
-            if not data:
-                return
+            # 如果提供了data参数，使用它；否则从send_edit获取
+            if data is not None:
+                # 处理十六进制发送
+                if self.hex_send:
+                    send_bytes = bytes.fromhex(data.replace(' ', ''))
+                else:
+                    send_bytes = data.encode('utf-8', errors='ignore')
+
+                # 添加回车换行
+                if self.add_crlf:
+                    send_bytes += b'\r\n'
+            else:
+                # 原有逻辑：从send_edit获取数据
+                send_bytes = self._get_send_data()
+                if not send_bytes:
+                    return
 
             # 发送数据
-            success = self.serial_manager.write(data)
+            success = self.serial_manager.write(send_bytes)
 
             if success:
                 # 记录发送日志
-                display_data = data.decode('utf-8', errors='ignore')
+                display_data = send_bytes.decode('utf-8', errors='ignore')
                 if self.hex_send:
-                    display_data = data.hex(' ').upper()
+                    display_data = send_bytes.hex(' ').upper()
 
                 # 显示发送数据
                 self._display_sent_data(display_data)

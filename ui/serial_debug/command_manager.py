@@ -5,7 +5,8 @@ import json
 from typing import List, Dict
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QScrollArea, QLabel
+    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QScrollArea,
+    QLabel, QDialog
 )
 from utils.logger import Logger
 
@@ -63,6 +64,10 @@ class CommandManager(QObject):
         """设置数据发送器"""
         self.data_sender = sender
 
+    def add_command(self, command_text: str = "", delay: int = 1000) -> None:
+        """添加命令（内部调用add_command_row）"""
+        self.add_command_row(command_text, delay)
+
     def add_command_row(self, command_text: str = "", delay: int = 1000) -> None:
         """添加命令行到UI
 
@@ -118,7 +123,8 @@ class CommandManager(QObject):
         # 发送按钮
         send_btn = QPushButton("发送")
         send_btn.setObjectName("send_btn")
-        send_btn.setStyleSheet(get_page_button_style('serial_debug', 'send', width=24, height=24))
+        send_btn.setStyleSheet(get_page_button_style('serial_debug', 'send', width=24, height=20) +
+                      "QPushButton { font-size: 8pt; }")
         send_btn.clicked.connect(lambda: self._send_command(command_edit, delay_edit))
         row_layout.addWidget(send_btn)
 
@@ -134,7 +140,7 @@ class CommandManager(QObject):
 
         # 删除按钮
         delete_btn = QPushButton("×")
-        delete_btn.setStyleSheet(get_page_button_style('serial_debug', 'delete', width=24, height=24))
+        delete_btn.setStyleSheet(get_page_button_style('serial_debug', 'delete', width=20, height=20))
         delete_btn.clicked.connect(lambda: self._remove_command_row(row_widget))
         row_layout.addWidget(delete_btn)
 
@@ -236,9 +242,11 @@ class CommandManager(QObject):
 
         # 清空UI
         if self.commands_layout:
-            for i in range(self.commands_layout.count() - 1):
+            # 从后往前删除，避免索引变化问题
+            for i in range(self.commands_layout.count() - 2, -1, -1):
                 widget = self.commands_layout.itemAt(i).widget()
                 if widget:
+                    self.commands_layout.removeWidget(widget)
                     widget.deleteLater()
 
     def get_command(self, index: int) -> Dict:
@@ -273,6 +281,10 @@ class CommandManager(QObject):
 
     def export_commands(self, file_path: str) -> bool:
         """导出命令列表"""
+
+        # 先同步命令数据
+        self._renumber_commands()
+
         if self.command_rows == 0:
             return False
 
@@ -302,9 +314,21 @@ class CommandManager(QObject):
             self.command_send_failed.emit("延时时间格式错误")
             return
 
-        # 发送命令信号
-        self.command_sent.emit(command_text)
-        Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
+        # 检查数据发送器是否可用
+        if not self.data_sender:
+            self.command_send_failed.emit("数据发送器未初始化")
+            return
+
+        # 通过数据发送器发送命令
+        try:
+            self.data_sender.send_data(command_text)
+            # 发送命令信号
+            self.command_sent.emit(command_text)
+            Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
+        except Exception as e:
+            self.command_send_failed.emit(f"发送命令失败: {str(e)}")
+            Logger.log(f"发送命令失败: {str(e)}", "ERROR")
+
 
     def toggle_loop_send(self, checked: bool) -> None:
         """切换循环发送状态"""
