@@ -916,7 +916,8 @@ PAGE_BUTTON_STYLES = {
 }
 
 def get_page_button_style(page: str, button: str, active: bool = False,
-                         width: int = None, height: int = None, is_3d: bool = False) -> str:
+                         width: int = None, height: int = None, is_3d: bool = False,
+                         expand_width: bool = False, expand_height: bool = False) -> str:
     """
     获取指定页面中指定按钮的样式
 
@@ -927,16 +928,22 @@ def get_page_button_style(page: str, button: str, active: bool = False,
         width: 自定义按钮宽度（像素），None则使用默认值
         height: 自定义按钮高度（像素），None则使用默认值
         is_3d: 是否使用 3D 效果
+        expand_width: 是否自适应容器宽度
+        expand_height: 是否自适应容器高度
 
     Returns:
         样式字符串
     """
     page_styles = PAGE_BUTTON_STYLES.get(page, {})
     style_type, size = page_styles.get(button, ('primary', 'normal'))
-    return get_button_style(style_type, size, active=active, width=width, height=height, is_3d=is_3d)
+    return get_button_style(style_type, size, active=active, width=width, height=height,
+                          is_3d=is_3d, expand_width=expand_width, expand_height=expand_height)
+
 
 def get_button_style(style_type: str = 'primary', size: str = 'normal',
-                    active: bool = False, width: int = None, height: int = None, is_3d: bool = False) -> str:
+                    active: bool = False, width: int = None, height: int = None, 
+                    is_3d: bool = False, expand_width: bool = False, 
+                    expand_height: bool = False) -> str:
     """
     获取按钮样式字符串
 
@@ -947,6 +954,8 @@ def get_button_style(style_type: str = 'primary', size: str = 'normal',
         width: 自定义按钮宽度（像素），None则使用默认值
         height: 自定义按钮高度（像素），None则使用默认值
         is_3d: 是否使用 3D 效果
+        expand_width: 是否自适应容器宽度
+        expand_height: 是否自适应容器高度
     """
     # 获取样式配置
     style = BUTTON_STYLES.get(style_type, BUTTON_STYLES['primary'])
@@ -978,11 +987,20 @@ def get_button_style(style_type: str = 'primary', size: str = 'normal',
     btn_width = width if width is not None else size_config['width']
     btn_height = height if height is not None else size_config['height']
 
+    # 根据自适应参数调整尺寸样式
+    if expand_width:
+        width_style = f"min-width: {btn_width}px;"
+    else:
+        width_style = f"min-width: {btn_width}px; max-width: {btn_width}px;"
+    
+    if expand_height:
+        height_style = f"min-height: {btn_height}px;"
+    else:
+        height_style = f"min-height: {btn_height}px; max-height: {btn_height}px;"
+
     size_style = f"""
-        min-width: {btn_width}px;
-        min-height: {btn_height}px;
-        max-width: {btn_width}px;
-        max-height: {btn_height}px;
+        {width_style}
+        {height_style}
         font-size: {size_config['font_size']}pt;
         padding: 2px 4px;
     """
@@ -1002,6 +1020,7 @@ def get_button_style(style_type: str = 'primary', size: str = 'normal',
             {disabled_style}
         }}
     """
+
 
 def get_page_radio_button_style(page: str, button: str, active: bool = False) -> str:
     """
