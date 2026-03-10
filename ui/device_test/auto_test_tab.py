@@ -45,7 +45,7 @@ class TestCase:
         self.start_time = None
         self.end_time = None
         self.source_file = source_file
-
+        self.is_selected = True
 
 class TestExecutor(QThread):
     """测试执行器线程"""
@@ -55,6 +55,7 @@ class TestExecutor(QThread):
     case_started = pyqtSignal(str)  # 添加测试用例开始信号，参数为测试用例名称
     case_finished = pyqtSignal(dict)  # 测试用例结果
     log_message = pyqtSignal(str, str)  # 日志消息, 级别
+    cases_reset = pyqtSignal()  # 测试用例状态重置信号
 
     def __init__(self, serial_controller):
         super().__init__()
@@ -98,7 +99,23 @@ class TestExecutor(QThread):
         for loop in range(self.loop_count):
             self.current_loop = loop + 1
 
+            # 每次循环开始前重置所有测试用例状态
+            for case in self.test_cases:
+                case.status = "未执行"
+                case.result = None
+                case.error_msg = None
+                case.start_time = None
+                case.end_time = None
+
+            # 发送信号通知UI更新
+            self.cases_reset.emit()
+            self.test_progress.emit(0, total_iterations)
+
             for file_name, cases in file_groups.items():
+                # 检查文件是否被选中
+                if not cases[0].is_selected:
+                    continue
+
                 if not self.is_running:
                     break
 
@@ -128,9 +145,9 @@ class TestExecutor(QThread):
                     # 命令延迟
                     time.sleep(self.command_delay)
 
-                # 更新进度
-                current_iteration += 1
-                self.test_progress.emit(current_iteration, total_iterations)
+                    # 更新进度
+                    current_iteration += 1
+                    self.test_progress.emit(current_iteration, total_iterations)
 
         self.is_running = False
         self.test_finished.emit()
@@ -212,6 +229,7 @@ class AutoTestTab(QWidget):
         self.test_cases = []
         self.test_results = []
         self.expanded_files = set()
+        self.selected_files = {}
         self.init_ui()
         self.init_connections()
         self.current_highlighted_case = None
@@ -237,8 +255,9 @@ class AutoTestTab(QWidget):
         right_panel = self.create_control_monitor_panel()
         splitter.addWidget(right_panel)
 
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
+        #splitter.setStretchFactor(0, 1)
+        #splitter.setStretchFactor(1, 1)
+        splitter.setSizes([400, 600])
 
         layout.addWidget(splitter)
 
@@ -317,6 +336,12 @@ class AutoTestTab(QWidget):
         self.case_tree.setColumnWidth(0, 500)  # 测试用例列宽
         self.case_tree.setColumnWidth(1, 60)  # 状态列宽
         self.case_tree.setColumnWidth(2, 60)   # 优先级列宽
+
+        # 设置列的拉伸模式
+        header = self.case_tree.header()
+        header.setSectionResizeMode(0, QHeaderView.Fixed)  # 测试用例列固定宽度
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # 状态列根据内容调整
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # 优先级列根据内容调整
 
         # 连接折叠/展开信号
         self.case_tree.expanded.connect(self.on_item_expanded)
@@ -649,6 +674,9 @@ class AutoTestTab(QWidget):
         if self.parent and hasattr(self.parent, 'config_tab'):
             self.serial_controller = self.parent.config_tab.serial_controller
 
+        # 连接项目变化信号
+        self.case_model.itemChanged.connect(self.on_item_changed)
+
     def import_test_cases(self):
         """导入测试用例"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -662,12 +690,30 @@ class AutoTestTab(QWidget):
             return
 
         try:
+            # 获取文件名作为来源标识
+            source_file = os.path.basename(file_path)
+
+            # 检查是否已存在相同名称的文件
+            existing_files = set(case.source_file for case in self.test_cases)
+            if source_file in existing_files:
+                reply = CustomMessageBox(
+                    "警告",
+                    f"测试用例文件 '{source_file}' 已存在，是否覆盖？",
+                    "question",
+                    self
+                ).exec_()
+
+                if reply != QDialogButtonBox.Yes:
+                    Logger.info(f"取消导入测试用例文件: {source_file}", module='auto_test')
+                    return
+
+                # 如果选择覆盖，先删除该文件下的所有测试用例
+                self.test_cases = [c for c in self.test_cases if c.source_file != source_file]
+                Logger.info(f"已删除原有测试用例文件: {source_file}", module='auto_test')
+
             if file_path.endswith('.json'):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     cases_data = json.load(f)
-
-                # 获取文件名作为来源标识
-                source_file = os.path.basename(file_path)
 
                 for case_data in cases_data:
                     case = TestCase(
@@ -945,6 +991,13 @@ class AutoTestTab(QWidget):
             # 创建文件节点
             file_item = QStandardItem(file_name)
             file_item.setEditable(False)
+            file_item.setCheckable(True)
+
+            # 设置复选框状态
+            if file_name in self.selected_files:
+                file_item.setCheckState(Qt.Checked if self.selected_files[file_name] else Qt.Unchecked)
+            else:
+                file_item.setCheckState(Qt.Checked)  # 默认选中
 
             # 设置文件节点图标（可选）
             file_item.setIcon(QIcon.fromTheme("folder"))
@@ -996,6 +1049,11 @@ class AutoTestTab(QWidget):
                 index = self.case_model.indexFromItem(file_item)
                 self.case_tree.expand(index)
 
+        # 设置列宽
+        self.case_tree.setColumnWidth(0, 500)  # 测试用例列宽
+        self.case_tree.setColumnWidth(1, 60)  # 状态列宽
+        self.case_tree.setColumnWidth(2, 60)   # 优先级列宽
+
     def delete_test_file(self):
         """删除测试用例文件及其所有测试用例"""
         # 获取当前选中的项目
@@ -1036,6 +1094,20 @@ class AutoTestTab(QWidget):
 
             # 记录日志
             Logger.info(f"已删除测试用例文件: {file_name}", module='auto_test')
+
+    def on_item_changed(self, item):
+        """处理项目变化（复选框状态变化）"""
+        if item.parent() is None:  # 文件节点
+            file_name = item.text()
+            is_checked = item.checkState() == Qt.Checked
+            self.selected_files[file_name] = is_checked
+
+            # 更新该文件下所有测试用例的选中状态
+            for case in self.test_cases:
+                if case.source_file == file_name:
+                    case.is_selected = is_checked
+
+            Logger.info(f"文件 '{file_name}' {'已选中' if is_checked else '已取消'}", module='auto_test')
 
     def on_serial_connected(self, connected):
         """串口连接状态变化处理"""
@@ -1079,6 +1151,7 @@ class AutoTestTab(QWidget):
         self.test_executor.case_started.connect(self.highlight_current_case)
         self.test_executor.case_finished.connect(self.on_case_finished)
         self.test_executor.log_message.connect(self.on_log_message)
+        self.test_executor.cases_reset.connect(self.on_cases_reset)
 
         # 更新UI状态
         self.start_btn.setEnabled(False)
@@ -1297,6 +1370,12 @@ class AutoTestTab(QWidget):
         if self.auto_scroll_check.isChecked():
             self.log_text.setTextCursor(cursor)
             self.log_text.ensureCursorVisible()
+
+    def on_cases_reset(self):
+        """处理测试用例状态重置"""
+        # 更新所有测试用例的状态显示
+        for case in self.test_cases:
+            self.update_case_status(case)
 
     def clear_log(self):
         """清空日志"""

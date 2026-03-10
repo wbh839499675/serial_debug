@@ -2,14 +2,17 @@
 设备控制标签页
 """
 import re
+import json
+from pathlib import Path
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QFormLayout,
     QTextEdit, QCheckBox, QFrame, QScrollArea, QSplitter, QSizePolicy,
-    QDialog
+    QDialog, QTabWidget, QToolButton
 )
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QColor, QTextCursor
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QUrl
+from PyQt5.QtGui import QFont, QColor, QTextCursor, QDesktopServices, QPixmap, QImage
 from serial.tools.list_ports import comports
 from utils.constants import get_group_style, get_combobox_style
 from utils.logger import Logger
@@ -33,26 +36,38 @@ class ConfigTab(QWidget):
         self.serial_monitor = None
         self.current_model = None
 
-        # 模块硬件资源配置
-        self.model_hardware_config = {
-            'SLM331Y': {
-                'gpio_pins': 16,
-                'adc_channels': 4,
-                'pwm_channels': 2,
-                'i2c_support': True,
-                'spi_support': True
-            },
-            'SLM332YC': {
-                'gpio_pins': 16,
-                'adc_channels': 4,
-                'pwm_channels': 2,
-                'i2c_support': True,
-                'spi_support': True
-            },
-        }
+        # 加载模块配置
+        script_dir = Path(__file__).parent.parent.parent / "script"
+        self.model_config_file = script_dir / "model_config.json"
+        self.model_config = self._load_model_config()
+
+        # 保存项目根目录，用于解析资源文件路径
+        self.project_root = Path(__file__).parent.parent.parent
 
         self.init_ui()
         self.init_connections()
+
+    def _load_model_config(self):
+        """加载模块配置"""
+        try:
+            if self.model_config_file.exists():
+                with open(self.model_config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    Logger.info(f"成功加载模块配置: {self.model_config_file}", module='device_control')
+                    return config
+            else:
+                Logger.error(f"模块配置文件不存在: {self.model_config_file}", module='device_control')
+                CustomMessageBox("错误", f"模块配置文件不存在: {self.model_config_file}", "error", self).exec_()
+                return {}
+        except json.JSONDecodeError as e:
+            Logger.error(f"模块配置文件格式错误: {str(e)}", module='device_control')
+            CustomMessageBox("错误", f"模块配置文件格式错误: {str(e)}", "error", self).exec_()
+            return {}
+        except Exception as e:
+            Logger.error(f"加载模块配置失败: {str(e)}", module='device_control')
+            CustomMessageBox("错误", f"加载模块配置失败: {str(e)}", "error", self).exec_()
+            return {}
+
 
     def init_ui(self):
         """初始化UI"""
@@ -247,8 +262,9 @@ class ConfigTab(QWidget):
         model_layout.addWidget(QLabel("选择模块型号:"))
 
         self.model_combo = QComboBox()
-        self.model_combo.addItems(["SLM331Y", "SLM332YC"])
-        self.model_combo.setCurrentText("SLM331Y")
+        self.model_combo.addItems(self.model_config.keys())
+        if self.model_config:
+            self.model_combo.setCurrentText(list(self.model_config.keys())[0])
         self.model_combo.setMinimumHeight(32)
         self.model_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
@@ -258,7 +274,7 @@ class ConfigTab(QWidget):
         layout.addLayout(model_layout)
 
         # 模块信息显示
-        self.model_info_label = QLabel("硬件资源: GPIO: 16, ADC: 4, PWM: 2, I2C: 支持, SPI: 支持; GNSS: 不支持")
+        self.model_info_label = QLabel("硬件资源: 请选择模块型号")
         self.model_info_label.setStyleSheet("""
             QLabel {
                 color: #606266;
@@ -270,7 +286,33 @@ class ConfigTab(QWidget):
         """)
         layout.addWidget(self.model_info_label)
 
+        # 模块资源展示区域
+        self.resource_tabs = QTabWidget()
+        self.resource_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QTabBar::tab {
+                background-color: #f5f7fa;
+                color: #606266;
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-size: 10pt;
+            }
+            QTabBar::tab:selected {
+                background-color: #67c23a;
+                color: white;
+                font-weight: bold;
+            }
+        """)
+        layout.addWidget(self.resource_tabs, 1)
+
         return card
+
     def create_data_monitor_card(self):
         """创建数据监控卡片"""
         card = QGroupBox("数据监控")
@@ -341,6 +383,216 @@ class ConfigTab(QWidget):
 
         return card
 
+    def update_model_resources(self, model_name):
+        """更新模块资源展示
+
+        Args:
+            model_name: 模块型号名称
+        """
+        # 清空现有标签页
+        while self.resource_tabs.count() > 0:
+            self.resource_tabs.removeTab(0)
+
+        if model_name not in self.model_config:
+            return
+
+        model_data = self.model_config[model_name]
+
+        # 创建引脚分布标签页
+        pinout_tab = QWidget()
+        pinout_layout = QVBoxLayout(pinout_tab)
+        pinout_layout.setContentsMargins(10, 10, 10, 10)
+
+        if 'resources' in model_data and 'pinout' in model_data['resources']:
+            pinout_data = model_data['resources']['pinout']
+            pinout_title = QLabel(pinout_data['title'])
+            pinout_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
+            pinout_layout.addWidget(pinout_title)
+
+            pinout_image = QLabel()
+            pinout_image.setAlignment(Qt.AlignCenter)
+            pinout_image.setStyleSheet("""
+                QLabel {
+                    background-color: #f5f7fa;
+                    border: 1px dashed #dcdfe6;
+                    border-radius: 4px;
+                    padding: 20px;
+                    min-height: 200px;
+                }
+            """)
+            pinout_image.setText(f"引脚分布图: {pinout_data['image']}")
+            pinout_layout.addWidget(pinout_image, 1)
+
+            pinout_desc = QLabel(pinout_data['description'])
+            pinout_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-top: 10px;")
+            pinout_layout.addWidget(pinout_desc)
+
+            open_pinout_btn = QPushButton("打开引脚分布图")
+            open_pinout_btn.clicked.connect(lambda: self.open_resource_file(pinout_data['image']))
+            pinout_layout.addWidget(open_pinout_btn)
+
+            pinout_layout.addStretch()
+            self.resource_tabs.addTab(pinout_tab, "📌 引脚分布")
+        else:
+            no_data_label = QLabel("暂无引脚分布图")
+            no_data_label.setAlignment(Qt.AlignCenter)
+            no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
+            pinout_layout.addWidget(no_data_label, 1)
+            self.resource_tabs.addTab(pinout_tab, "📌 引脚分布")
+
+        # 创建原理图标签页
+        schematic_tab = QWidget()
+        schematic_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        schematic_layout = QVBoxLayout(schematic_tab)
+        schematic_layout.setContentsMargins(10, 10, 10, 10)
+
+        if 'resources' in model_data and 'schematic' in model_data['resources']:
+            schematic_data = model_data['resources']['schematic']
+            schematic_title = QLabel(schematic_data['title'])
+            schematic_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
+            schematic_layout.addWidget(schematic_title)
+
+            # PDF文件信息显示
+            file_info_layout = QHBoxLayout()
+            file_info_layout.addWidget(QLabel("文件:"))
+            file_name_label = QLabel(schematic_data['image'])
+            file_name_label.setStyleSheet("color: #606266; font-size: 10pt;")
+            file_info_layout.addWidget(file_name_label)
+            file_info_layout.addStretch()
+            schematic_layout.addLayout(file_info_layout)
+
+            schematic_desc = QLabel(schematic_data['description'])
+            schematic_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-bottom: 10px;")
+            schematic_layout.addWidget(schematic_desc)
+
+            # 使用QWebEngineView显示PDF
+            pdf_viewer = QWebEngineView()
+            pdf_viewer.setMinimumHeight(600)
+            pdf_viewer.setStyleSheet("""
+                QWebEngineView {
+                    background-color: white;
+                    border: 1px solid #dcdfe6;
+                    border-radius: 4px;
+                }
+            """)
+
+            # 加载PDF文件
+            image_path = Path(schematic_data['image'])
+            if not image_path.is_absolute():
+                image_path = self.project_root / image_path
+
+            if image_path.exists():
+                try:
+                    # 使用QUrl加载本地PDF文件
+                    from PyQt5.QtCore import QUrl
+                    file_url = QUrl.fromLocalFile(str(image_path))
+                    Logger.info(f"PDF文件URL: {file_url.toString()}", module='device_control')
+                    pdf_viewer.setUrl(file_url)
+
+                    # 添加加载完成信号处理
+                    def on_load_finished(success):
+                        if success:
+                            Logger.info("PDF文件加载成功", module='device_control')
+                        else:
+                            Logger.error("PDF文件加载失败", module='device_control')
+                            pdf_viewer.setHtml(f"""
+                                <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
+                                    PDF文件加载失败: {image_path.name}
+                                </div>
+                            """)
+
+                    pdf_viewer.loadFinished.connect(on_load_finished)
+                except Exception as e:
+                    Logger.error(f"加载PDF文件异常: {str(e)}", module='device_control')
+                    pdf_viewer.setHtml(f"""
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
+                            加载PDF文件异常: {str(e)}
+                        </div>
+                    """)
+            else:
+                Logger.error(f"PDF文件不存在: {image_path}", module='device_control')
+                # 显示文件不存在提示
+                pdf_viewer.setHtml(f"""
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
+                        文件不存在: {image_path.name}
+                    </div>
+                """)
+
+            schematic_layout.addWidget(pdf_viewer, 1)
+
+            # 打开原理图按钮
+            open_schematic_btn = QPushButton("使用外部程序打开")
+            open_schematic_btn.clicked.connect(lambda: self.open_resource_file(schematic_data['image']))
+            schematic_layout.addWidget(open_schematic_btn)
+
+            schematic_layout.addStretch()
+            self.resource_tabs.addTab(schematic_tab, "🔧 原理图")
+        else:
+            no_data_label = QLabel("暂无原理图")
+            no_data_label.setAlignment(Qt.AlignCenter)
+            no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
+            schematic_layout.addWidget(no_data_label, 1)
+            self.resource_tabs.addTab(schematic_tab, "🔧 原理图")
+
+        # 创建硬件设计手册标签页
+        manual_tab = QWidget()
+        manual_layout = QVBoxLayout(manual_tab)
+        manual_layout.setContentsMargins(5, 5, 5, 5)
+
+        if 'resources' in model_data and 'manual' in model_data['resources']:
+            manual_data = model_data['resources']['manual']
+            manual_title = QLabel(manual_data['title'])
+            manual_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
+            manual_layout.addWidget(manual_title)
+
+            manual_info = QLabel(f"文件: {manual_data['file']}")
+            manual_info.setStyleSheet("color: #606266; font-size: 10pt; margin-bottom: 10px;")
+            manual_layout.addWidget(manual_info)
+
+            manual_desc = QLabel(manual_data['description'])
+            manual_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-bottom: 20px;")
+            manual_layout.addWidget(manual_desc)
+
+            open_manual_btn = QPushButton("打开硬件设计手册")
+            open_manual_btn.clicked.connect(lambda: self.open_resource_file(manual_data['file']))
+            manual_layout.addWidget(open_manual_btn)
+
+            manual_layout.addStretch()
+            self.resource_tabs.addTab(manual_tab, "📘 设计手册")
+        else:
+            no_data_label = QLabel("暂无硬件设计手册")
+            no_data_label.setAlignment(Qt.AlignCenter)
+            no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
+            manual_layout.addWidget(no_data_label, 1)
+            self.resource_tabs.addTab(manual_tab, "📘 设计手册")
+
+    def open_resource_file(self, file_path):
+        """打开资源文件
+
+        Args:
+            file_path: 文件路径（可以是相对路径或绝对路径）
+        """
+        try:
+            # 转换为Path对象
+            path = Path(file_path)
+
+            # 如果是相对路径，则基于项目根目录解析
+            if not path.is_absolute():
+                path = self.project_root / path
+
+            # 检查文件是否存在
+            if path.exists():
+                # 使用系统默认程序打开文件
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+                Logger.info(f"已打开文件: {path}", module='device_control')
+            else:
+                CustomMessageBox("提示", f"文件不存在: {path}", "info", self).exec_()
+                Logger.warning(f"文件不存在: {path}", module='device_control')
+        except Exception as e:
+            CustomMessageBox("错误", f"打开文件失败: {str(e)}", "error", self).exec_()
+            Logger.error(f"打开文件失败: {str(e)}", module='device_control')
+
+
     def show_serial_config_dialog(self):
         """显示串口配置对话框"""
         # 获取当前串口配置，如果串口已连接则从串口控制器获取，否则使用默认值
@@ -408,14 +660,22 @@ class ConfigTab(QWidget):
         if self.current_model == model_name:
             return
         self.current_model = model_name
+
         # 更新模块信息显示
-        if model_name in self.model_hardware_config:
-            config = self.model_hardware_config[model_name]
-            info_text = f"硬件资源: GPIO: {config['gpio_pins']}, ADC: {config['adc_channels']}, PWM: {config['pwm_channels']}, I2C: {'支持' if config['i2c_support'] else '不支持'}, SPI: {'支持' if config['spi_support'] else '不支持'}"
-            self.model_info_label.setText(info_text)
+        if model_name in self.model_config:
+            model_data = self.model_config[model_name]
+            if 'hardware' in model_data:
+                hw = model_data['hardware']
+                info_text = f"硬件资源: GPIO: {hw['gpio_pins']}, ADC: {hw['adc_channels']}, PWM: {hw['pwm_channels']}, I2C: {'支持' if hw['i2c_support'] else '不支持'}, SPI: {'支持' if hw['spi_support'] else '不支持'}, UART: {hw['uart_channels']}, GNSS: {'支持' if hw['gnss_support'] else '不支持'}"
+                self.model_info_label.setText(info_text)
+
+            # 更新模块资源展示
+            self.update_model_resources(model_name)
+
         # 发送模组型号变化信号，通知其他页面
         self.model_changed.emit(model_name)
         Logger.info(f"模块型号已切换为: {model_name}", module='device_control')
+
 
     def toggle_serial(self):
         """切换串口连接状态"""

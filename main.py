@@ -1,5 +1,6 @@
 import sys
 import os
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QCoreApplication
 
@@ -11,6 +12,12 @@ def setup_qt_environment():
     # 设置环境变量
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugins_path
     QCoreApplication.addLibraryPath(plugins_path)
+
+    # 设置OpenGL上下文共享属性
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    # 设置高DPI缩放
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 def main():
     setup_qt_environment()
