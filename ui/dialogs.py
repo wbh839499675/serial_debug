@@ -828,14 +828,14 @@ from utils.constants import get_custom_dialog_style
 class CustomMessageBox(QDialog):
     """自定义消息框，支持标题栏渐变"""
 
-    def __init__(self, title: str, message: str, icon_type: str = 'info', style_type: str = 'tech', parent=None):
+    def __init__(self, title: str, message: str, icon_type: str = 'info', style: str = 'tech', parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         # 应用样式
-        self.setStyleSheet(get_custom_dialog_style(style_type))
+        self.setStyleSheet(get_custom_dialog_style(style))
         #self.setStyleSheet(get_custom_dialog_style('modern'))
         #self.setStyleSheet(get_custom_dialog_style('neon'))
         #self.setStyleSheet(get_custom_dialog_style('glass'))
@@ -971,12 +971,22 @@ class CustomMessageBox(QDialog):
             }}
         """)
 
+        # 更新标题栏背景色
+        title_bar = self.findChild(QWidget, "title_bar")
+        if title_bar:
+            title_bar.setStyleSheet(f"""
+                QWidget#title_bar {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 {color}, stop:1 {color}dd);
+                }}
+            """)
+
         # 更新标题颜色 - 使用更亮的颜色确保可读性
         title_label = self.findChild(QLabel, "title_label")
         if title_label:
             title_label.setStyleSheet(f"""
                 QLabel#title_label {{
-                    color: #ffffff;
+                    color: #FFFFFF !important;
                     font-size: 11pt;
                     font-weight: 700;
                     padding: 0 6px;

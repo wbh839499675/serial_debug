@@ -1,0 +1,150 @@
+[
+    {
+        "command": "AT+MGPSCFG=?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"outport\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"outport\",\"nonw\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"outport\",\"uart1\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"outport\",\"usbat\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"outport\",\"usbnmea\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"nmeasrc\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"nmeasrc\",0",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"nmeasrc\",1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssnmeatype\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssnmeatype\",0",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssnmeatype\",1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssnmeatype\",2",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssnmeatype\",31",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",0",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",2",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",3",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",4",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",5",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",6",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"gnssconfig\",7",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"autogps\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"autogps\",0",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSCFG=\"autogps\",1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPS=?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPS?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPS=1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPS",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSEND=?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSEND?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSEND=1",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSEND",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSNMEA=?",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSNMEA=\"RMC\"",
+        "delay": "1000"
+    },
+    {
+        "command": "AT+MGPSNMEA=\"GGA\"",
+        "delay": "1000"
+    }
+]

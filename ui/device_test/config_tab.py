@@ -445,19 +445,15 @@ class ConfigTab(QWidget):
         # 防止递归调用
         if self.current_model == model_name:
             return
-
         self.current_model = model_name
         # 更新模块信息显示
         if model_name in self.model_hardware_config:
             config = self.model_hardware_config[model_name]
             info_text = f"硬件资源: GPIO: {config['gpio_pins']}, ADC: {config['adc_channels']}, PWM: {config['pwm_channels']}, I2C: {'支持' if config['i2c_support'] else '不支持'}, SPI: {'支持' if config['spi_support'] else '不支持'}"
             self.model_info_label.setText(info_text)
-
-        # 移除这行，避免递归调用
-        # self.model_changed.emit(model_name)
-
+        # 发送模组型号变化信号，通知其他页面
+        self.model_changed.emit(model_name)
         Logger.info(f"模块型号已切换为: {model_name}", module='device_control')
-
 
     def connect_serial(self):
         """连接串口"""

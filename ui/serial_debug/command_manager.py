@@ -21,15 +21,49 @@ from utils.constants import (
 
 from ui.serial_debug.data_sender import DataSender
 
+class CommandEdit(QLineEdit):
+    """自定义命令编辑框，支持双击编辑提示文本"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.original_text = ""
+        self.is_editing_placeholder = False
+
+    def mouseDoubleClickEvent(self, event):
+        """鼠标双击事件"""
+        # 如果当前没有文本，或者正在编辑占位符文本
+        if not self.text() or self.is_editing_placeholder:
+            # 保存原始文本
+            self.original_text = self.text()
+            # 设置为编辑状态
+            self.is_editing_placeholder = True
+            # 清空文本
+            self.clear()
+            # 设置焦点
+            self.setFocus()
+        else:
+            # 调用父类的双击事件
+            super().mouseDoubleClickEvent(event)
+
+    def focusOutEvent(self, event):
+        """失去焦点事件"""
+        # 如果正在编辑占位符文本，且文本为空
+        if self.is_editing_placeholder and not self.text():
+            # 恢复原始文本
+            self.setText(self.original_text)
+            self.is_editing_placeholder = False
+        # 调用父类的失去焦点事件
+        super().focusOutEvent(event)
+
 class DraggableCommandRow(QWidget):
     """可拖拽的命令行组件"""
-    
+
     def __init__(self, parent=None, command_manager=None):
         super().__init__(parent)
         self.command_manager = command_manager
         self.setAcceptDrops(True)
         self.drag_start_position = None
-        
+
     def mousePressEvent(self, event):
         """鼠标按下事件"""
         if event.button() == Qt.LeftButton:
@@ -42,39 +76,39 @@ class DraggableCommandRow(QWidget):
                 event.ignore()
         else:
             event.ignore()
-    
+
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
         if not (event.buttons() & Qt.LeftButton):
             return
-            
+
         if not self.drag_start_position:
             return
-            
+
         if (event.pos() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
             return
-            
+
         # 开始拖拽
         drag = QDrag(self)
         mime_data = QMimeData()
-        
+
         # 设置拖拽数据
         mime_data.setText(f"command_row:{self.command_manager._get_row_index(self)}")
         drag.setMimeData(mime_data)
-        
+
         # 创建拖拽时的预览图
         pixmap = QPixmap(self.size())
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
         self.render(painter)
         painter.end()
-        
+
         drag.setPixmap(pixmap)
         drag.setHotSpot(event.pos())
-        
+
         # 执行拖拽
         drag.exec_(Qt.MoveAction)
-    
+
     def dragEnterEvent(self, event):
         """拖拽进入事件"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
@@ -95,11 +129,11 @@ class DraggableCommandRow(QWidget):
             # 获取源行索引
             source_index = int(event.mimeData().text().split(":")[1])
             target_index = self.command_manager._get_row_index(self)
-            
+
             # 交换命令行位置
             if source_index != target_index:
                 self.command_manager._swap_command_rows(source_index, target_index)
-            
+
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -190,14 +224,14 @@ class CommandManager(QObject):
 
         # 命令编号
         row_number = QLabel(f"{self.command_rows + 1}.")
-        row_number.setStyleSheet(get_page_label_style('serial_debug', 'row_number') +
-                         "QLabel { cursor: grab; }")
+        row_number.setStyleSheet(get_page_label_style('serial_debug', 'row_number'))
+        row_number.setCursor(Qt.OpenHandCursor)
         row_number.setFixedWidth(18)
         row_number.setToolTip("拖拽可调整命令顺序")
         row_layout.addWidget(row_number)
 
         # 命令编辑框
-        command_edit = QLineEdit()
+        command_edit = CommandEdit()
         command_edit.setText(command_text)
         command_edit.setStyleSheet(get_page_line_edit_style('serial_debug',
                                                             'command_edit',
@@ -476,6 +510,7 @@ class CommandManager(QObject):
             # 开始循环发送
             self.is_loop_sending = True
             self.loop_send_started.emit(0)
+            self.loop_send_progress.emit(1, self.command_rows)  # 立即显示第1次
             self._send_next_command()
         else:
             # 停止循环发送

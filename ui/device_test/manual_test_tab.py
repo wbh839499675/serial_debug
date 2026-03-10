@@ -14,6 +14,7 @@ from PyQt5.QtGui import QFont, QColor, QTextCursor
 from utils.logger import Logger
 from ui.dialogs import CustomMessageBox
 from ui.device_test.command_manager import ATCommandManager
+from ui.device_test.command_sets_manager import CommandSetsManager
 from utils.constants import get_button_style
 from PyQt5.QtWidgets import QLayout, QWidget, QSizePolicy
 from PyQt5.QtCore import Qt, QRect, QPoint, QSize
@@ -21,81 +22,17 @@ from PyQt5.QtCore import Qt, QRect, QPoint, QSize
 class ManualTestTab(QWidget):
     """手动测试标签页"""
 
-    # 定义不同模组型号的命令集
-    MODEL_COMMAND_SETS = {
-        "SLM331Y": {
-            "基础命令集": [
-                ("AT", "测试AT命令"),
-                ("ATI", "查询模块信息"),
-                ("AT+CGSN", "查询IMEI"),
-                ("AT+CIMI", "查询IMSI"),
-            ],
-            "网络命令集": [
-                ("AT+CSQ", "查询信号强度"),
-                ("AT+CREG?", "查询网络注册"),
-                ("AT+COPS?", "查询运营商"),
-                ("AT+CPIN?", "查询SIM卡状态"),
-                ("AT+CGATT?", "查询附着状态"),
-                ("AT+CGACT?", "查询PDP上下文"),
-                ("AT+CGPADDR", "查询本地IP"),
-            ],
-            "GNSS命令集": [
-                ("AT+MGPSCFG=?", "配置GNSS,测试命令"),
-                ("AT+MGPSCFG?", "配置GNSS,查询命令"),
-                ("AT+MGPSCFG=\"outport\"", "查询NMEA输出端口"),
-                ("AT+MGPSCFG=\"nmeasrc\"", "控制NMEA语句"),
-                ("AT+MGPSCFG=\"gnssnmeatype\"", "配置NMEA语句的输出类型"),
-                ("AT+MGPSCFG=\"gnssconfig\"", "配置支持的GNSS卫星导航系统"),
-                ("AT+MGPSCFG=\"autogps\"", "启用/禁用GNSS自启动"),
-                ("AT+MGPSCFG=\"beidounmeaformat\"", "配置BDS NMEA语句的前缀"),
-                ("AT+MGPSCFG=\"apflash\"", "启用/禁用AP Flash 快速热启动功能"),
-                ("AT+MGPSDEL=?", "删除辅助数据"),
-                ("AT+MGPSDEL=0", "删除所有辅助数据。开启GNSS后，强制冷启动"),
-                ("AT+MGPSDEL=1", "不删除数据。开启GNSS后，条件允许时进行热启动"),
-                ("AT+MGPSDEL=2", "删除部分相关数据。开启GNSS后，条件允许时进行温启动"),
-                ("AT+MGPS=1", "打开GNSS会话"),
-                ("AT+MGPS?", "查询GNSS会话状态"),
-                ("AT+MGPSEND", "关闭GNSS会话"),
-                ("AT+MGPSLOC=?", "获取定位信息,测试命令"),
-                ("AT+MGPSLOC?", "获取定位信息,查询命令"),
-                ("AT+MGPSLOC=0", "获取定位信息,模式0"),
-                ("AT+MGPSLOC=1", "获取定位信息,模式1"),
-                ("AT+MGPSLOC=2", "获取定位信息,模式2"),
-                ("AT+MGPSNMEA=?", "获取指定的NMEA语句,测试命令"),
-                ("AT+MGPSNMEA?", "获取指定的NMEA语句,查询命令"),
-                ("AT+MGPSNMEA=\"GGA\"", "获取指定GGA语句"),
-                ("AT+MGPSNMEA=\"RMC\"", "获取指定RMC语句"),
-                ("AT+MGPSNMEA=\"GSV\"", "获取指定GSV语句"),
-                ("AT+MGPSNMEA=\"GSA\"", "获取指定GSA语句"),
-                ("AT+MGPSNMEA=\"VTG\"", "获取指定VTG语句"),
-                ("AT+MAGPS=?", "启用/禁用AGPS,测试命令"),
-                ("AT+MAGPS?", "查询AGPS状态"),
-                ("AT+MAGPS=1", "启用AGPS"),
-                ("AT+MAGPS=0", "禁用AGPS"),
-            ],
-            "音频命令集": [
-                ("AT+QAUDCH", "查询音频通道"),
-                ("AT+QAUDMOD", "查询音频模式"),
-                ("AT+QAUDPLAY", "播放音频"),
-                ("AT+QAUDREC", "录音"),
-            ],
-            "文件操作命令集": [
-                ("AT+QFLST", "列出文件"),
-                ("AT+QFDEL", "删除文件"),
-                ("AT+QFCOPY", "复制文件"),
-                ("AT+QFOPEN", "打开文件"),
-                ("AT+QFREAD", "读取文件"),
-                ("AT+QFWRITE", "写入文件"),
-            ],
-        }
-    }
-
-    # 当前命令集，默认使用SLM331Y的命令集
-    COMMAND_SETS = MODEL_COMMAND_SETS["SLM331Y"]
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
+
+        # 初始化命令集管理器
+        self.command_sets_manager = CommandSetsManager()
+
+        # 获取默认命令集
+        default_model = "SLM331Y"
+        self.COMMAND_SETS = self.command_sets_manager.get_command_sets(default_model)
+
         # 尝试获取主窗口的 relay_controller
         self.relay_controller = None
         if parent:
@@ -132,10 +69,11 @@ class ManualTestTab(QWidget):
         Args:
             model_name: 模组型号名称
         """
-        if model_name in self.MODEL_COMMAND_SETS:
-            # 更新当前命令集
-            self.COMMAND_SETS = self.MODEL_COMMAND_SETS[model_name]
+        # 更新当前命令集
+        print("on_model_changed, model_name: {model_name}")
+        self.COMMAND_SETS = self.command_sets_manager.get_command_sets(model_name)
 
+        if self.COMMAND_SETS:
             # 更新命令集下拉框
             self.command_set_combo.clear()
             self.command_set_combo.addItems(self.COMMAND_SETS.keys())
@@ -144,6 +82,8 @@ class ManualTestTab(QWidget):
             self.update_command_buttons(self.command_set_combo.currentText())
 
             Logger.info(f"模组型号已切换为: {model_name}, 命令集已更新", module='manual_test')
+        else:
+            Logger.warning(f"未找到模组型号 {model_name} 的命令集", module='manual_test')
 
     def on_serial_connected(self, connected):
         """串口连接状态变化处理"""
@@ -406,8 +346,12 @@ class ManualTestTab(QWidget):
             # 修改尺寸策略，使按钮宽度根据内容自适应
             btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)  # 使用Minimum策略
 
-            # 确保按钮文本不会被截断，增加边距
-            text_width = btn.fontMetrics().boundingRect(cmd).width()  # 使用boundingRect获取更准确的宽度
+            # 计算文本宽度，考虑按钮内边距和样式
+            font_metrics = btn.fontMetrics()
+            # 使用boundingRect获取文本的精确尺寸，包括字符间距
+            text_rect = font_metrics.boundingRect(cmd)
+            # 增加额外的空间：左右各10像素内边距 + 4像素边框
+            text_width = text_rect.width() + 24
 
             btn.setToolTip(desc)  # 描述信息作为工具提示
             btn_style = get_button_style('primary', 'small', width=text_width + 20)

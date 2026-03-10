@@ -401,6 +401,11 @@ class SerialDebugTab(QWidget):
             self.serial_manager.disconnected.connect(self._on_disconnected)
             self.serial_manager.connection_failed.connect(self._on_connection_failed)
 
+            # 命令管理器信号连接
+            self.command_manager.loop_send_started.connect(self._on_loop_send_started)
+            self.command_manager.loop_send_stopped.connect(self._on_loop_send_stopped)
+            self.command_manager.loop_send_progress.connect(self._on_loop_send_progress)
+
             Logger.log("信号连接已更新", "DEBUG")
         except Exception as e:
             Logger.log(f"信号连接失败: {str(e)}", "ERROR")
@@ -1463,14 +1468,10 @@ class SerialDebugCoordinator(QObject):
     def _connect_signals(self):
         """连接各模块间的信号"""
         # 串口管理器 -> 数据接收器
-        self.serial_manager.data_received.connect(
-            self.data_receiver.process_data
-        )
+        self.serial_manager.data_received.connect(self.data_receiver.process_data)
 
         # 数据发送器 -> 串口管理器
-        self.data_sender.send_request.connect(
-            self.serial_manager.write
-        )
+        self.data_sender.send_request.connect(self.serial_manager.write)
 
 class LineNumberArea(QWidget):
     """行号显示区域"""
