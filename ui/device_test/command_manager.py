@@ -1,5 +1,9 @@
+from pathlib import Path
+from typing import Dict, List, Tuple
+import json
 import re
-
+import time
+from utils.logger import Logger
 
 class ATCommandManager:
     """AT命令管理器"""
@@ -9,10 +13,16 @@ class ATCommandManager:
         self.command_history = []
         self.common_commands = self._load_common_commands()
 
+        # 命令集管理功能
+        self.config_file = Path("script/model_commands.json")
+        self.model_command_sets = self._load_command_sets()
+
     def _load_common_commands(self):
         """加载常用AT命令"""
         return {
             '查询模块信息': 'ATI',
+            '查询固件版本': 'AT+SGSW',
+            '查询硬件版本': 'AT+SFHW',
             '查询IMEI': 'AT+CGSN',
             '查询IMSI': 'AT+CIMI',
             '查询信号强度': 'AT+CSQ',
@@ -21,9 +31,6 @@ class ATCommandManager:
             '查询SIM卡状态': 'AT+CPIN?',
             '查询附着状态': 'AT+CGATT?',
             '查询PDP上下文': 'AT+CGACT?',
-            '查询本地IP': 'AT+CGPADDR',
-            '查询GPS状态': 'AT+QGPS?',
-            '查询GPS位置': 'AT+QGPSLOC?'
         }
 
     def send_command(self, port_name, command, timeout=1.0):
@@ -121,19 +128,7 @@ class ATCommandManager:
                 attached = int(match.group(1))
                 result['data']['attached'] = attached
                 result['data']['status'] = '已附着' if attached == 1 else '未附着'
-        
-        elif command == 'AT+QGPSLOC?':
-            # 解析GPS位置信息
-            match = re.search(r'\+QGPSLOC:\s*(.+)', response)
-            if match:
-                parts = match.group(1).split(',')
-                if len(parts) >= 5:
-                    result['data']['utc'] = parts[0]
-                    result['data']['latitude'] = parts[1]
-                    result['data']['longitude'] = parts[2]
-                    result['data']['altitude'] = parts[3]
-                    result['data']['speed'] = parts[4]
-        
+
         # 添加对运营商信息的解析
         elif command == 'AT+COPS?':
             match = re.search(r'\+COPS:\s*(\d+),(\d+),"([^"]+)"', response)
@@ -141,12 +136,51 @@ class ATCommandManager:
                 result['data']['mode'] = int(match.group(1))
                 result['data']['format'] = int(match.group(2))
                 result['data']['operator'] = match.group(3)
-        
+
         # 添加对IP地址的解析
         elif command == 'AT+CGPADDR':
             match = re.search(r'\+CGPADDR:\s*\d+,"([^"]+)"', response)
             if match:
                 result['data']['ip'] = match.group(1)
-        
+
         return result
 
+    def _load_command_sets(self) -> Dict[str, Dict[str, List[Tuple[str, str]]]]:
+        """
+        加载命令集配置
+
+        Returns:
+            命令集字典
+        """
+        try:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # 将列表转换为元组
+            for model, command_sets in data.items():
+                for set_name, commands in command_sets.items():
+                    data[model][set_name] = [tuple(cmd) for cmd in commands]
+
+            Logger.info(f"成功加载命令集配置: {self.config_file}", module='command_manager')
+            return data
+        except FileNotFoundError:
+            Logger.error(f"命令集配置文件不存在: {self.config_file}", module='command_manager')
+            return {}
+        except json.JSONDecodeError as e:
+            Logger.error(f"命令集配置文件格式错误: {str(e)}", module='command_manager')
+            return {}
+        except Exception as e:
+            Logger.error(f"加载命令集配置失败: {str(e)}", module='command_manager')
+            return {}
+
+    def get_command_sets(self, model_name: str) -> Dict[str, List[Tuple[str, str]]]:
+        """
+        获取指定模组型号的命令集
+
+        Args:
+            model_name: 模组型号名称
+
+        Returns:
+            命令集字典
+        """
+        return self.model_command_sets.get(model_name, {})

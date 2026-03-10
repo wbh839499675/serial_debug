@@ -77,7 +77,7 @@ class ControlPage(QWidget):
 
     def create_serial_card(self):
         """创建串口控制卡片"""
-        card = QGroupBox("🔌 串口连接")
+        card = QGroupBox("🔗 串口连接")
         card.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;

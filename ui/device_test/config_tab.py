@@ -5,14 +5,15 @@ import re
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QFormLayout,
-    QTextEdit, QCheckBox, QFrame, QScrollArea, QSplitter, QSizePolicy
+    QTextEdit, QCheckBox, QFrame, QScrollArea, QSplitter, QSizePolicy,
+    QDialog
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QTextCursor
 from serial.tools.list_ports import comports
 from utils.constants import get_group_style, get_combobox_style
 from utils.logger import Logger
-from ui.dialogs import CustomMessageBox
+from ui.dialogs import CustomMessageBox, SerialConfigDialog
 from core.serial_controller import SerialController
 
 
@@ -57,7 +58,7 @@ class ConfigTab(QWidget):
         """初始化UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        layout.setSpacing(5)
 
         # 创建滚动区域
         scroll = QScrollArea()
@@ -73,22 +74,15 @@ class ConfigTab(QWidget):
         """)
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(15)
-
-        # 创建水平布局容器，用于放置串口配置和模组型号选择卡片
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(15)
+        scroll_layout.setSpacing(5)
 
         # 串口配置卡片
         serial_config_card = self.create_serial_config_card()
-        top_layout.addWidget(serial_config_card, 1)  # 添加stretch factor为1
+        scroll_layout.addWidget(serial_config_card)
 
         # 模块选择卡片
         model_select_card = self.create_model_select_card()
-        top_layout.addWidget(model_select_card, 1)  # 添加stretch factor为1
-
-        # 将水平布局添加到滚动区域
-        scroll_layout.addLayout(top_layout)
+        scroll_layout.addWidget(model_select_card)
 
         # 数据监控卡片
         #data_monitor_card = self.create_data_monitor_card()
@@ -99,44 +93,59 @@ class ConfigTab(QWidget):
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
 
-
     def create_serial_config_card(self):
         """创建串口配置卡片"""
         card = QGroupBox("串口配置")
-        card.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 11pt;
-                border: 2px solid #409eff;
-                border-radius: 8px;
-                margin-top: 15px;
-                padding-top: 20px;
-                background-color: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 12px 0 12px;
-                color: #409eff;
+        card.setStyleSheet(get_group_style('primary'))
+        layout = QHBoxLayout(card)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 10, 15, 10)
+
+        # 1. 连接/断开指示灯
+        self.serial_status_indicator = QLabel("●")
+        self.serial_status_indicator.setStyleSheet("""
+            QLabel {
+                font-size: 20pt;
+                color: #dcdfe6;
+                qproperty-alignment: AlignCenter;
             }
         """)
-        layout = QGridLayout(card)
-        layout.setSpacing(12)  # 增加控件间距
-        layout.setContentsMargins(15, 20, 15, 15)
+        layout.addWidget(self.serial_status_indicator)
 
-        # 第一行：串口和波特率配置
-        # 串口选择
-        layout.addWidget(QLabel("串口:"), 0, 0, alignment=Qt.AlignRight | Qt.AlignVCenter)
+        # 2. 端口号ComboBox
         self.port_combo = QComboBox()
+        self.port_combo.setMinimumWidth(230)
         self.port_combo.setMinimumHeight(32)
-        self.port_combo.setMinimumWidth(180)  # 设置最小宽度
         self.port_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.refresh_ports()
-        layout.addWidget(self.port_combo, 0, 1)
+        layout.addWidget(self.port_combo)
 
-        # 刷新按钮
+        # 3. 配置按钮
+        config_btn = QPushButton("⚙️")
+        config_btn.setFixedSize(32, 32)
+        config_btn.setToolTip("串口参数配置")
+        config_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #909399;
+                color: white;
+                font-weight: bold;
+                border-radius: 4px;
+                font-size: 14pt;
+            }
+            QPushButton:hover {
+                background-color: #a6a9ad;
+            }
+            QPushButton:pressed {
+                background-color: #82848a;
+            }
+        """)
+        config_btn.clicked.connect(self.show_serial_config_dialog)
+        layout.addWidget(config_btn)
+
+        # 4. 刷新按钮
         refresh_btn = QPushButton("🔄")
-        refresh_btn.setFixedSize(32, 32)  # 固定大小
+        refresh_btn.setFixedSize(32, 32)
+        refresh_btn.setToolTip("刷新串口列表")
         refresh_btn.setStyleSheet("""
             QPushButton {
                 background-color: #409eff;
@@ -153,124 +162,42 @@ class ConfigTab(QWidget):
             }
         """)
         refresh_btn.clicked.connect(self.refresh_ports)
-        layout.addWidget(refresh_btn, 0, 2)
+        layout.addWidget(refresh_btn)
 
-        # 波特率选择
-        layout.addWidget(QLabel("波特率:"), 0, 3, alignment=Qt.AlignRight | Qt.AlignVCenter)
-        self.baudrate_combo = QComboBox()
-        self.baudrate_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.baudrate_combo.addItems(["4800", "9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600"])
-        self.baudrate_combo.setCurrentText("115200")
-        self.baudrate_combo.setStyleSheet(get_combobox_style('primary', 'small'))
-        layout.addWidget(self.baudrate_combo, 0, 4)
-
-        # 第二行：数据位和校验位配置
-        # 数据位选择
-        layout.addWidget(QLabel("数据位:"), 1, 0, alignment=Qt.AlignRight | Qt.AlignVCenter)
-        self.databits_combo = QComboBox()
-        self.databits_combo.addItems(["5", "6", "7", "8"])
-        self.databits_combo.setCurrentText("8")
-        self.databits_combo.setMinimumHeight(32)
-        self.databits_combo.setMinimumWidth(150)  # 设置最小宽度
-        self.databits_combo.setStyleSheet(get_combobox_style('primary', 'small'))
-        layout.addWidget(self.databits_combo, 1, 1)
-
-        # 校验位选择
-        layout.addWidget(QLabel("校验位:"), 1, 3, alignment=Qt.AlignRight | Qt.AlignVCenter)
-        self.parity_combo = QComboBox()
-        self.parity_combo.addItems(["None", "Even", "Odd", "Mark", "Space"])
-        self.parity_combo.setCurrentText("None")
-        self.parity_combo.setMinimumHeight(32)
-        self.parity_combo.setMinimumWidth(150)  # 设置最小宽度
-        self.parity_combo.setStyleSheet(get_combobox_style('primary', 'small'))
-        layout.addWidget(self.parity_combo, 1, 4)
-
-        # 第三行：停止位和连接状态
-        # 停止位选择
-        layout.addWidget(QLabel("停止位:"), 2, 0, alignment=Qt.AlignRight | Qt.AlignVCenter)
-        self.stopbits_combo = QComboBox()
-        self.stopbits_combo.addItems(["1", "1.5", "2"])
-        self.stopbits_combo.setCurrentText("1")
-        self.stopbits_combo.setMinimumHeight(32)
-        self.stopbits_combo.setMinimumWidth(150)  # 设置最小宽度
-        self.stopbits_combo.setStyleSheet(get_combobox_style('primary', 'small'))
-        layout.addWidget(self.stopbits_combo, 2, 1)
-
-        # 连接状态指示灯和标签
-        status_layout = QHBoxLayout()
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        status_layout.setSpacing(10)
-
-        self.serial_status_indicator = QLabel("●")
-        self.serial_status_indicator.setStyleSheet("""
-            QLabel {
-                font-size: 24pt;
-                color: #dcdfe6;
-                qproperty-alignment: AlignCenter;
-            }
-        """)
-        status_layout.addWidget(self.serial_status_indicator)
-
-        self.serial_status_label = QLabel("未连接")
-        self.serial_status_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        status_layout.addWidget(self.serial_status_label)
-
-        # 模块状态
-        self.module_status_label = QLabel("模块: 未选择")
-        self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-        status_layout.addWidget(self.module_status_label)
-
-        status_layout.addStretch()
-        layout.addLayout(status_layout, 2, 2, 1, 3)
-
-        # 第四行：连接/断开按钮
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.connect_btn = QPushButton("🔗 连接")
-        self.connect_btn.setMinimumHeight(36)
-        self.connect_btn.setMinimumWidth(120)  # 设置最小宽度
-        self.connect_btn.setStyleSheet("""
+        # 5. 连接/断开Toggle按钮
+        self.toggle_btn = QPushButton("🔗 连接")
+        self.toggle_btn.setCheckable(True)
+        self.toggle_btn.setMinimumHeight(32)
+        self.toggle_btn.setStyleSheet("""
             QPushButton {
-                background-color: #67c23a;
+                background-color: #409eff;
                 color: white;
                 font-weight: bold;
-                padding: 10px;
+                padding: 8px 15px;
                 border-radius: 4px;
                 font-size: 11pt;
+                width: 60px;
             }
             QPushButton:hover {
-                background-color: #85ce61;
+                background-color: #66b1ff;
             }
             QPushButton:pressed {
-                background-color: #5daf34;
+                background-color: #3a8ee6;
             }
-            QPushButton:disabled {
-                background-color: #c0c4cc;
-                color: #ffffff;
-            }
-        """)
-        self.connect_btn.clicked.connect(self.connect_serial)
-        button_layout.addWidget(self.connect_btn)
-
-        self.disconnect_btn = QPushButton("🔌 断开")
-        self.disconnect_btn.setMinimumHeight(36)
-        self.disconnect_btn.setMinimumWidth(120)  # 设置最小宽度
-        self.disconnect_btn.setEnabled(False)
-        self.disconnect_btn.setStyleSheet("""
-            QPushButton {
+            QPushButton:checked {
                 background-color: #f56c6c;
                 color: white;
                 font-weight: bold;
-                padding: 10px;
+                padding: 8px 15px;
                 border-radius: 4px;
                 font-size: 11pt;
+                width: 60px;
             }
-            QPushButton:hover {
+            QPushButton:checked:hover {
                 background-color: #f78989;
+                width: 60px;
             }
-            QPushButton:pressed {
+            QPushButton:checked:pressed {
                 background-color: #dd6161;
             }
             QPushButton:disabled {
@@ -278,20 +205,19 @@ class ConfigTab(QWidget):
                 color: #ffffff;
             }
         """)
-        self.disconnect_btn.clicked.connect(self.disconnect_serial)
-        button_layout.addWidget(self.disconnect_btn)
+        self.toggle_btn.clicked.connect(self.toggle_serial)
+        layout.addWidget(self.toggle_btn)
 
-        button_layout.addStretch()
-        layout.addLayout(button_layout, 3, 0, 1, 5)
+        # 添加弹性空间
+        layout.addStretch()
 
-        # 设置列宽比例
-        layout.setColumnStretch(0, 0)  # 标签列，固定宽度
-        layout.setColumnStretch(1, 1)  # 控件列
-        layout.setColumnStretch(2, 0)  # 刷新按钮列，固定宽度
-        layout.setColumnStretch(3, 0)  # 标签列，固定宽度
-        layout.setColumnStretch(4, 1)  # 控件列
+        # 状态标签
+        self.module_status_label = QLabel("模块: 未选择")
+        self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
+        layout.addWidget(self.module_status_label)
 
         return card
+
 
     def create_model_select_card(self):
         """创建模块选择卡片"""
@@ -415,6 +341,42 @@ class ConfigTab(QWidget):
 
         return card
 
+    def show_serial_config_dialog(self):
+        """显示串口配置对话框"""
+        # 获取当前串口配置，如果串口已连接则从串口控制器获取，否则使用默认值
+        if self.serial_controller and self.serial_controller.is_connected:
+            baudrate = self.serial_controller.baudrate
+            databits = self.serial_controller.databits
+            parity = self.serial_controller.parity
+            stopbits = self.serial_controller.stopbits
+        else:
+            # 使用默认值
+            baudrate = 115200
+            databits = 8
+            parity = 'N'
+            stopbits = 1
+
+        dialog = SerialConfigDialog(
+            baudrate=baudrate,
+            databits=databits,
+            parity=parity,
+            stopbits=stopbits,
+            parent=self
+        )
+
+        if dialog.exec_() == QDialog.Accepted:
+            # 如果串口已连接，则重新连接以应用新配置
+            if self.serial_controller and self.serial_controller.is_connected:
+                # 先断开连接
+                self.serial_controller.close()
+                # 使用新配置重新连接
+                port_name = self.port_combo.currentData()
+                if port_name:
+                    self.serial_controller.open(port_name, dialog.baudrate)
+                    Logger.info(f"串口参数已更新并重新连接: 波特率={dialog.baudrate}", module='serial')
+            else:
+                Logger.info(f"串口参数已更新: 波特率={dialog.baudrate}", module='serial')
+
     def init_connections(self):
         """初始化信号连接"""
         # 串口连接信号
@@ -431,7 +393,7 @@ class ConfigTab(QWidget):
         self.port_combo.clear()
         ports = comports()
         for port in ports:
-            display_text = f"{port.device} - {port.description}"
+            display_text = f"{port.description}"
             self.port_combo.addItem(display_text, port.device)
 
         # 恢复之前选择的串口
@@ -455,6 +417,18 @@ class ConfigTab(QWidget):
         self.model_changed.emit(model_name)
         Logger.info(f"模块型号已切换为: {model_name}", module='device_control')
 
+    def toggle_serial(self):
+        """切换串口连接状态"""
+        if self.toggle_btn.isChecked():
+            # 尝试连接串口
+            self.connect_serial()
+            # 如果连接失败，恢复按钮状态
+            if not self.serial_controller or not self.serial_controller.is_connected:
+                self.toggle_btn.setChecked(False)
+        else:
+            # 断开串口
+            self.disconnect_serial()
+
     def connect_serial(self):
         """连接串口"""
         port_name = self.port_combo.currentData()
@@ -462,37 +436,36 @@ class ConfigTab(QWidget):
             CustomMessageBox("警告", "请选择串口", "warning", self).exec_()
             return
 
-        baudrate = int(self.baudrate_combo.currentText())
-        data_bits = int(self.databits_combo.currentText())
-        parity = self.parity_combo.currentText()[0]  # 取第一个字符: N, E, O, M, S
-        stop_bits = float(self.stopbits_combo.currentText())
+        # 获取串口参数，如果串口已连接则从串口控制器获取，否则使用默认值
+        if self.serial_controller and self.serial_controller.is_connected:
+            baudrate = self.serial_controller.baudrate
+            data_bits = self.serial_controller.databits
+            parity = self.serial_controller.parity
+            stop_bits = self.serial_controller.stopbits
+        else:
+            # 使用默认值
+            baudrate = 115200
+            data_bits = 8
+            parity = 'N'
+            stop_bits = 1
 
         # 连接串口
         if self.serial_controller:
             success = self.serial_controller.open(port_name, baudrate)
 
             if success:
-                self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 24pt;")
-                self.serial_status_label.setText("已连接")
-                self.connect_btn.setEnabled(False)
-                self.disconnect_btn.setEnabled(True)
-                self.port_combo.setEnabled(False)
-                self.baudrate_combo.setEnabled(False)
-                self.databits_combo.setEnabled(False)
-                self.parity_combo.setEnabled(False)
-                self.stopbits_combo.setEnabled(False)
-
-                # 更新模块状态
+                self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 20pt;")
                 self.module_status_label.setText(f"模块: {self.current_model}")
+                self.port_combo.setEnabled(False)
 
                 # 发送连接信号
                 self.serial_connected.emit(True)
+                self.toggle_btn.setText("⛓ 断开")
                 Logger.info(f"串口 {port_name} 已连接", module='serial')
             else:
                 CustomMessageBox("错误", "连接串口失败", "error", self).exec_()
         else:
             CustomMessageBox("错误", "串口控制器未初始化", "error", self).exec_()
-
 
     def disconnect_serial(self):
         """断开串口"""
@@ -502,30 +475,21 @@ class ConfigTab(QWidget):
 
         # 断开串口
         if self.serial_controller:
-            success = self.serial_controller.close()  # 使用 close() 方法代替 disconnect_port()
+            success = self.serial_controller.close()
 
             if success:
-                self.serial_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 24pt;")
-                self.serial_status_label.setText("未连接")
-                self.connect_btn.setEnabled(True)
-                self.disconnect_btn.setEnabled(False)
-                self.port_combo.setEnabled(True)
-                self.baudrate_combo.setEnabled(True)
-                self.databits_combo.setEnabled(True)
-                self.parity_combo.setEnabled(True)
-                self.stopbits_combo.setEnabled(True)
-
-                # 更新模块状态
+                self.serial_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 20pt;")
                 self.module_status_label.setText("模块: 未选择")
+                self.port_combo.setEnabled(True)
 
                 # 发送断开信号
                 self.serial_disconnected.emit(True)
+                self.toggle_btn.setText("🔗 连接")
                 Logger.info(f"串口 {port_name} 已断开", module='serial')
             else:
                 CustomMessageBox("错误", "断开串口失败", "error", self).exec_()
         else:
             CustomMessageBox("错误", "串口控制器未初始化", "error", self).exec_()
-
 
     def on_serial_connected(self, connected):
         """串口连接状态变化处理"""

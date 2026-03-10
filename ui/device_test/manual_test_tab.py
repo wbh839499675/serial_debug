@@ -14,10 +14,8 @@ from PyQt5.QtGui import QFont, QColor, QTextCursor
 from utils.logger import Logger
 from ui.dialogs import CustomMessageBox
 from ui.device_test.command_manager import ATCommandManager
-from ui.device_test.command_sets_manager import CommandSetsManager
 from utils.constants import get_button_style
-from PyQt5.QtWidgets import QLayout, QWidget, QSizePolicy
-from PyQt5.QtCore import Qt, QRect, QPoint, QSize
+
 
 class ManualTestTab(QWidget):
     """手动测试标签页"""
@@ -26,12 +24,14 @@ class ManualTestTab(QWidget):
         super().__init__(parent)
         self.parent_window = parent
 
+        self.serial_controller = None
+
         # 初始化命令集管理器
-        self.command_sets_manager = CommandSetsManager()
+        self.at_manager = ATCommandManager(None)
 
         # 获取默认命令集
         default_model = "SLM331Y"
-        self.COMMAND_SETS = self.command_sets_manager.get_command_sets(default_model)
+        self.COMMAND_SETS = self.at_manager.get_command_sets(default_model)
 
         # 尝试获取主窗口的 relay_controller
         self.relay_controller = None
@@ -49,7 +49,7 @@ class ManualTestTab(QWidget):
                 if hasattr(main_window, 'relay_controller'):
                     self.relay_controller = main_window.relay_controller
 
-        self.serial_controller = None if parent is None else (parent.config_tab.serial_controller if hasattr(parent, 'config_tab') else None)
+        #self.serial_controller = None if parent is None else (parent.config_tab.serial_controller if hasattr(parent, 'config_tab') else None)
         self.at_manager = None
         self.command_history = []
         self.init_ui()
@@ -69,9 +69,11 @@ class ManualTestTab(QWidget):
         Args:
             model_name: 模组型号名称
         """
+        if not self.at_manager:
+            self.at_manager = ATCommandManager(self.serial_controller)
+
         # 更新当前命令集
-        print("on_model_changed, model_name: {model_name}")
-        self.COMMAND_SETS = self.command_sets_manager.get_command_sets(model_name)
+        self.COMMAND_SETS = self.at_manager.get_command_sets(model_name)
 
         if self.COMMAND_SETS:
             # 更新命令集下拉框
@@ -91,6 +93,8 @@ class ManualTestTab(QWidget):
             # 更新串口控制器引用
             if self.parent_window and hasattr(self.parent_window, 'config_tab'):
                 self.serial_controller = self.parent_window.config_tab.serial_controller
+                if self.at_manager:
+                    self.at_manager.serial_controller = self.serial_controller
             Logger.info("串口已连接，手动测试页已更新", module='manual_test')
 
     def on_serial_disconnected(self, disconnected):
@@ -98,6 +102,7 @@ class ManualTestTab(QWidget):
         if disconnected:
             # 清除串口控制器引用
             self.serial_controller = None
+            #self.at_manager.serial_controller = None
             Logger.info("串口已断开，手动测试页已更新", module='manual_test')
 
     def init_ui(self):
@@ -494,7 +499,7 @@ class ManualTestTab(QWidget):
 
     def boot_on_device(self):
         """设备开机"""
-        if not self.serial_controller or not self.serial_controller.is_connected():
+        if not self.serial_controller or not self.serial_controller.is_connected:
             CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
 
@@ -519,7 +524,7 @@ class ManualTestTab(QWidget):
 
     def boot_off_device(self):
         """设备关机"""
-        if not self.serial_controller or not self.serial_controller.is_connected():
+        if not self.serial_controller or not self.serial_controller.is_connected:
             CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
 
@@ -543,7 +548,7 @@ class ManualTestTab(QWidget):
 
     def reset_device(self):
         """设备复位"""
-        if not self.serial_controller or not self.serial_controller.is_connected():
+        if not self.serial_controller or not self.serial_controller.is_connected:
             CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
 
@@ -566,7 +571,7 @@ class ManualTestTab(QWidget):
 
     def send_command(self, command=None):
         """发送AT命令"""
-        if not self.serial_controller or not self.serial_controller.is_connected():
+        if not self.serial_controller or not self.serial_controller.is_connected:
             CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
         if not command:

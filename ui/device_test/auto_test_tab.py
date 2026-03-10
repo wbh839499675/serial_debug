@@ -1058,7 +1058,7 @@ class AutoTestTab(QWidget):
 
     def start_test(self):
         """开始测试"""
-        if not self.serial_controller or not self.serial_controller.is_connected():
+        if not self.serial_controller or not self.serial_controller.is_connected:
             CustomMessageBox("警告", "请先连接串口", "warning", self).exec_()
             return
 

@@ -331,7 +331,7 @@ class SerialDebugTab(QWidget):
 
     data_received = pyqtSignal(str)  # 接收到数据信号
 
-    def __init__(self, port_name: str="", baudrate: int = 115200, databits: int = 8, 
+    def __init__(self, port_name: str="", baudrate: int = 115200, databits: int = 8,
                  stopbits: float = 1, parity: str = 'N', parent=None):
         super().__init__(parent)
         self.parent = parent
@@ -736,7 +736,7 @@ class SerialDebugTab(QWidget):
             return
 
         self.is_connected = True
-        self.connect_btn.setText("🔌断开连接")
+        self.connect_btn.setText("⛓ 断开连接")
         self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'disconnect'))
 
         Logger.log(f"串口 {port_name} 已打开", "SUCCESS")
@@ -856,7 +856,7 @@ class SerialDebugTab(QWidget):
         self.is_connected = False
 
         # 更新UI
-        self.connect_btn.setText("🔗连接串口")
+        self.connect_btn.setText("🔗 连接串口")
         self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'connect'))
 
         # 通知父页面更新状态

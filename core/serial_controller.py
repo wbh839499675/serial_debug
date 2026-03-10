@@ -61,6 +61,13 @@ class SerialController(QObject):
         self.serial_port = None
         self.reader = None
         self.read_thread = None
+        self.is_connected = False
+
+        # 添加串口参数属性
+        self.baudrate = 115200
+        self.databits = 8
+        self.parity = 'N'
+        self.stopbits = 1
 
     def is_connected(self) -> bool:
         """检查串口连接状态"""
@@ -69,11 +76,16 @@ class SerialController(QObject):
     def open(self, port: str, baudrate: int = 115200, timeout: int = 1) -> bool:
         """打开串口"""
         try:
+            # 保存串口参数
+            self.baudrate = baudrate
+            # 注意：这里简化处理，实际应用中可能需要添加更多参数
+
             self.serial_port = serial.Serial(
                 port=port,
                 baudrate=baudrate,
                 timeout=timeout
             )
+            self.is_connected = True
             return True
         except Exception as e:
             return False
@@ -92,6 +104,7 @@ class SerialController(QObject):
                 self.read_thread.wait()
             if self.serial_port and self.serial_port.is_open:
                 self.serial_port.close()
+                self.is_connected = True
             return True
         except Exception as e:
             Logger.error(f"关闭串口失败: {str(e)}", module='serial')

@@ -415,7 +415,7 @@ class MainWindow(QMainWindow):
                     timeout=1
                 )
                 self.serial_is_open = True
-                self.serial_btn.setText("🔌 断开串口")
+                self.serial_btn.setText("⛓ 断开串口")
                 self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 24pt;")
                 self.port_combo.setEnabled(False)
                 self.baudrate_combo.setEnabled(False)

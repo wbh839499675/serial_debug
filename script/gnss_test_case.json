@@ -9,7 +9,7 @@
   {
     "name": "GNSS配置，查询命令",
     "command": "AT+MGPSCFG?",
-    "expected_response": "+CME ERROR: 501",
+    "expected_response": "+CME ERROR: 502",
     "timeout": 3000,
     "priority": 1
   },

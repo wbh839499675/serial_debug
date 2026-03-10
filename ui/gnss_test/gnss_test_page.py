@@ -85,7 +85,7 @@ class GNSSTestPage(QWidget):
         management_layout.addWidget(self.connect_all_btn, 0, 5)
 
         # 断开所有按钮
-        self.disconnect_all_btn = QPushButton("🔌 断开所有")
+        self.disconnect_all_btn = QPushButton("⛓ 断开所有")
         self.disconnect_all_btn.setStyleSheet(get_page_button_style('gnss', 'disconnect'))
         self.disconnect_all_btn.clicked.connect(self.disconnect_all_devices)
         management_layout.addWidget(self.disconnect_all_btn, 0, 6)

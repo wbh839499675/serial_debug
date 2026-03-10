@@ -1,0 +1,10 @@
+[
+    {
+        "command": "ATI",
+        "delay": "1000"
+    },
+    {
+        "command": "AT",
+        "delay": "1000"
+    }
+]
