@@ -159,24 +159,18 @@ class ManualTestTab(QWidget):
         # 设备通电/断电按钮
         self.power_btn = QPushButton("🔌 通电")
         self.power_btn.setCheckable(True)
-        self.power_btn.setMinimumHeight(40)
-        self.power_btn.setMinimumWidth(100)
-        self.power_btn.setStyleSheet(get_button_style('success'))
+        self.power_btn.setStyleSheet(get_button_style('success', width=80))
         self.power_btn.clicked.connect(self.toggle_power)
         power_layout.addWidget(self.power_btn)
 
         # 设备开机/关机按钮
         boot_on_btn = QPushButton("▶ 开机")
-        boot_on_btn.setMinimumHeight(40)
-        boot_on_btn.setMinimumWidth(100)
-        boot_on_btn.setStyleSheet(get_button_style('primary'))
+        boot_on_btn.setStyleSheet(get_button_style('primary', width=80))
         boot_on_btn.clicked.connect(self.boot_on_device)
         power_layout.addWidget(boot_on_btn)
 
         boot_off_btn = QPushButton("⏹ 关机")
-        boot_off_btn.setMinimumHeight(40)
-        boot_off_btn.setMinimumWidth(100)
-        boot_off_btn.setStyleSheet(get_button_style('warning'))
+        boot_off_btn.setStyleSheet(get_button_style('warning', width=80))
         boot_off_btn.clicked.connect(self.boot_off_device)
         power_layout.addWidget(boot_off_btn)
 
@@ -184,16 +178,14 @@ class ManualTestTab(QWidget):
 
         # 设备复位按钮
         reset_btn = QPushButton("🔄 复位")
-        reset_btn.setMinimumHeight(40)
-        reset_btn.setMinimumWidth(100)
-        reset_btn.setStyleSheet(get_button_style('info'))
+        reset_btn.setStyleSheet(get_button_style('info', width=80))
         reset_btn.clicked.connect(self.reset_device)
         power_layout.addWidget(reset_btn)
 
         layout.addLayout(power_layout)
 
         # 设置卡片固定宽度
-        card.setFixedWidth(500)
+        card.setFixedWidth(400)
 
         return card
 
@@ -245,12 +237,12 @@ class ManualTestTab(QWidget):
         input_layout.addWidget(self.command_combo, 1)
 
         send_btn = QPushButton("📤 发送")
-        send_btn.setStyleSheet(get_button_style('primary'))
+        send_btn.setStyleSheet(get_button_style('primary', width=80))
         send_btn.clicked.connect(self.send_command)
         input_layout.addWidget(send_btn)
 
         clear_history_btn = QPushButton("🗑️ 清除历史")
-        clear_history_btn.setStyleSheet(get_button_style('danger'))
+        clear_history_btn.setStyleSheet(get_button_style('danger', width=80))
         clear_history_btn.clicked.connect(self.clear_command_history)
         input_layout.addWidget(clear_history_btn)
 

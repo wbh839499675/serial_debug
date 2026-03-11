@@ -7,30 +7,66 @@
       "i2c_support": true,
       "spi_support": true,
       "uart_channels": 3,
-      "gnss_support": true
+      "gnss_support": false
     },
     "info": {
       "name": "SLM331Y",
       "description": "LTE Cat.1 模组",
       "manufacturer": "EC617",
-      "datasheet": "docs/SLM331Y_Datasheet.pdf",
-      "schematic": "docs/SLM331Y_Schematic.pdf",
+      "datasheet": "docs/SLM331Y/SLM331Y_Datasheet.pdf",
+      "schematic": "docs/SLM331Y/SLM331Y_Schematic.pdf",
       "pinout": "docs/SLM331Y_Pinout.png"
     },
     "resources": {
       "pinout": {
         "title": "引脚分布",
-        "image": "docs/SLM331Y_Pinout.png",
+        "image": "docs/SLM331Y/SLM331Y_Pinout.png",
         "description": "模块引脚分布图"
       },
       "schematic": {
         "title": "原理图",
-        "image": "docs/SLM331Y_Schematic.png",
+        "image": "docs/SLM331Y/SLM331Y_Schematic.png",
         "description": "模块原理图"
       },
       "manual": {
         "title": "硬件设计手册",
-        "file": "docs/SLM331Y_Manual.pdf",
+        "file": "docs/SLM331Y/SLM331Y_Manual.pdf",
+        "description": "硬件设计手册"
+      }
+    }
+  },
+  "SLM332Y": {
+    "hardware": {
+      "gpio_pins": 16,
+      "adc_channels": 4,
+      "pwm_channels": 2,
+      "i2c_support": true,
+      "spi_support": true,
+      "uart_channels": 3,
+      "gnss_support": false
+    },
+    "info": {
+      "name": "SLM332Y",
+      "description": "LTE Cat.1 模组",
+      "manufacturer": "EC618",
+      "datasheet": "docs/SLM332Y/SLM332Y_Datasheet.pdf",
+      "schematic": "docs/SLM332Y/SLM332Y_Schematic.pdf",
+      "pinout": "docs/SLM332YC/SLM332Y_Pinout.png"
+    },
+    "resources": {
+      "pinout": {
+        "title": "引脚分布",
+        "image": "docs/SLM332Y/SLM332Y_Pinout.png",
+        "description": "模块引脚分布图"
+      },
+      "schematic": {
+        "title": "原理图",
+        "image": "docs/SLM332Y/SLM332Y_MB_SCH_V1.00_260206_1550_GPS_PDF.pdf",
+        "description": "模块原理图"
+      },
+      "manual": {
+        "title": "硬件设计手册",
+        "file": "docs/SLM332Y/SLM332Y_Manual.pdf",
         "description": "硬件设计手册"
       }
     }

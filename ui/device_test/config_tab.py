@@ -19,6 +19,59 @@ from utils.logger import Logger
 from ui.dialogs import CustomMessageBox, SerialConfigDialog
 from core.serial_controller import SerialController
 
+class ImageLabel(QLabel):
+    """支持缩放的图片标签"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.original_pixmap = None
+        self.scale_factor = 1.0
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(300, 300)
+        # 设置大小策略，允许控件根据内容调整大小
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+    def setPixmap(self, pixmap):
+        """设置图片并保存原始图片"""
+        self.original_pixmap = pixmap
+        self.update_display()
+
+    def update_display(self):
+        """更新显示的图片"""
+        if self.original_pixmap:
+            scaled_pixmap = self.original_pixmap.scaled(
+                self.original_pixmap.size() * self.scale_factor,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            super().setPixmap(scaled_pixmap)
+            # 更新标签大小以匹配缩放后的图片大小
+            self.resize(scaled_pixmap.size())
+
+    def wheelEvent(self, event):
+        """处理鼠标滚轮事件"""
+        if event.modifiers() & Qt.ControlModifier:
+            # Ctrl+滚轮：缩放图片
+            angle = event.angleDelta().y()
+            if angle > 0:
+                # 向上滚动，放大
+                self.scale_factor *= 1.1
+            else:
+                # 向下滚动，缩小
+                self.scale_factor *= 0.9
+
+            # 限制缩放范围
+            self.scale_factor = max(0.1, min(10.0, self.scale_factor))
+            self.update_display()
+            event.accept()
+        else:
+            # 普通滚轮：传递给父类处理
+            super().wheelEvent(event)
+
+    def reset_zoom(self):
+        """重置缩放"""
+        self.scale_factor = 1.0
+        self.update_display()
 
 class ConfigTab(QWidget):
     """设备控制标签页"""
@@ -262,9 +315,8 @@ class ConfigTab(QWidget):
         model_layout.addWidget(QLabel("选择模块型号:"))
 
         self.model_combo = QComboBox()
+        self.model_combo.addItem("请选择模块型号", None)
         self.model_combo.addItems(self.model_config.keys())
-        if self.model_config:
-            self.model_combo.setCurrentText(list(self.model_config.keys())[0])
         self.model_combo.setMinimumHeight(32)
         self.model_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
@@ -405,31 +457,71 @@ class ConfigTab(QWidget):
 
         if 'resources' in model_data and 'pinout' in model_data['resources']:
             pinout_data = model_data['resources']['pinout']
-            pinout_title = QLabel(pinout_data['title'])
-            pinout_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
-            pinout_layout.addWidget(pinout_title)
 
-            pinout_image = QLabel()
-            pinout_image.setAlignment(Qt.AlignCenter)
-            pinout_image.setStyleSheet("""
-                QLabel {
+            # 创建滚动区域
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(False)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            scroll_area.setStyleSheet("""
+                QScrollArea {
                     background-color: #f5f7fa;
                     border: 1px dashed #dcdfe6;
                     border-radius: 4px;
-                    padding: 20px;
-                    min-height: 200px;
+                }
+                QScrollBar:vertical {
+                    border: none;
+                    background: #f0f0f0;
+                    width: 12px;
+                    margin: 0px 0px 0px 0px;
+                }
+                QScrollBar::handle:vertical {
+                    background: #c0c0c0;
+                    min-height: 20px;
+                    border-radius: 6px;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+                QScrollBar:horizontal {
+                    border: none;
+                    background: #f0f0f0;
+                    height: 12px;
+                    margin: 0px 0px 0px 0px;
+                }
+                QScrollBar::handle:horizontal {
+                    background: #c0c0c0;
+                    min-width: 20px;
+                }
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                    width: 0px;
                 }
             """)
-            pinout_image.setText(f"引脚分布图: {pinout_data['image']}")
-            pinout_layout.addWidget(pinout_image, 1)
 
-            pinout_desc = QLabel(pinout_data['description'])
-            pinout_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-top: 10px;")
-            pinout_layout.addWidget(pinout_desc)
+            # 创建图片标签
+            pinout_image = ImageLabel()
+            pinout_image.setAlignment(Qt.AlignCenter)
+            pinout_image.setMinimumSize(300, 300)
 
-            open_pinout_btn = QPushButton("打开引脚分布图")
-            open_pinout_btn.clicked.connect(lambda: self.open_resource_file(pinout_data['image']))
-            pinout_layout.addWidget(open_pinout_btn)
+            # 加载并显示图片
+            image_path = Path(pinout_data['image'])
+            if not image_path.is_absolute():
+                image_path = self.project_root / image_path
+
+            if image_path.exists():
+                pixmap = QPixmap(str(image_path))
+                if not pixmap.isNull():
+                    pinout_image.setPixmap(pixmap)
+                else:
+                    pinout_image.setText(f"无法加载图片: {pinout_data['image']}")
+            else:
+                pinout_image.setText(f"文件不存在: {pinout_data['image']}")
+
+            # 将图片标签设置为滚动区域的内容
+            scroll_area.setWidget(pinout_image)
+
+            # 添加滚动区域到布局
+            pinout_layout.addWidget(scroll_area, 1)
 
             pinout_layout.addStretch()
             self.resource_tabs.addTab(pinout_tab, "📌 引脚分布")
@@ -439,132 +531,6 @@ class ConfigTab(QWidget):
             no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
             pinout_layout.addWidget(no_data_label, 1)
             self.resource_tabs.addTab(pinout_tab, "📌 引脚分布")
-
-        # 创建原理图标签页
-        schematic_tab = QWidget()
-        schematic_tab.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        schematic_layout = QVBoxLayout(schematic_tab)
-        schematic_layout.setContentsMargins(10, 10, 10, 10)
-
-        if 'resources' in model_data and 'schematic' in model_data['resources']:
-            schematic_data = model_data['resources']['schematic']
-            schematic_title = QLabel(schematic_data['title'])
-            schematic_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
-            schematic_layout.addWidget(schematic_title)
-
-            # PDF文件信息显示
-            file_info_layout = QHBoxLayout()
-            file_info_layout.addWidget(QLabel("文件:"))
-            file_name_label = QLabel(schematic_data['image'])
-            file_name_label.setStyleSheet("color: #606266; font-size: 10pt;")
-            file_info_layout.addWidget(file_name_label)
-            file_info_layout.addStretch()
-            schematic_layout.addLayout(file_info_layout)
-
-            schematic_desc = QLabel(schematic_data['description'])
-            schematic_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-bottom: 10px;")
-            schematic_layout.addWidget(schematic_desc)
-
-            # 使用QWebEngineView显示PDF
-            pdf_viewer = QWebEngineView()
-            pdf_viewer.setMinimumHeight(600)
-            pdf_viewer.setStyleSheet("""
-                QWebEngineView {
-                    background-color: white;
-                    border: 1px solid #dcdfe6;
-                    border-radius: 4px;
-                }
-            """)
-
-            # 加载PDF文件
-            image_path = Path(schematic_data['image'])
-            if not image_path.is_absolute():
-                image_path = self.project_root / image_path
-
-            if image_path.exists():
-                try:
-                    # 使用QUrl加载本地PDF文件
-                    from PyQt5.QtCore import QUrl
-                    file_url = QUrl.fromLocalFile(str(image_path))
-                    Logger.info(f"PDF文件URL: {file_url.toString()}", module='device_control')
-                    pdf_viewer.setUrl(file_url)
-
-                    # 添加加载完成信号处理
-                    def on_load_finished(success):
-                        if success:
-                            Logger.info("PDF文件加载成功", module='device_control')
-                        else:
-                            Logger.error("PDF文件加载失败", module='device_control')
-                            pdf_viewer.setHtml(f"""
-                                <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
-                                    PDF文件加载失败: {image_path.name}
-                                </div>
-                            """)
-
-                    pdf_viewer.loadFinished.connect(on_load_finished)
-                except Exception as e:
-                    Logger.error(f"加载PDF文件异常: {str(e)}", module='device_control')
-                    pdf_viewer.setHtml(f"""
-                        <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
-                            加载PDF文件异常: {str(e)}
-                        </div>
-                    """)
-            else:
-                Logger.error(f"PDF文件不存在: {image_path}", module='device_control')
-                # 显示文件不存在提示
-                pdf_viewer.setHtml(f"""
-                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #f56c6c; font-size: 12pt;">
-                        文件不存在: {image_path.name}
-                    </div>
-                """)
-
-            schematic_layout.addWidget(pdf_viewer, 1)
-
-            # 打开原理图按钮
-            open_schematic_btn = QPushButton("使用外部程序打开")
-            open_schematic_btn.clicked.connect(lambda: self.open_resource_file(schematic_data['image']))
-            schematic_layout.addWidget(open_schematic_btn)
-
-            schematic_layout.addStretch()
-            self.resource_tabs.addTab(schematic_tab, "🔧 原理图")
-        else:
-            no_data_label = QLabel("暂无原理图")
-            no_data_label.setAlignment(Qt.AlignCenter)
-            no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
-            schematic_layout.addWidget(no_data_label, 1)
-            self.resource_tabs.addTab(schematic_tab, "🔧 原理图")
-
-        # 创建硬件设计手册标签页
-        manual_tab = QWidget()
-        manual_layout = QVBoxLayout(manual_tab)
-        manual_layout.setContentsMargins(5, 5, 5, 5)
-
-        if 'resources' in model_data and 'manual' in model_data['resources']:
-            manual_data = model_data['resources']['manual']
-            manual_title = QLabel(manual_data['title'])
-            manual_title.setStyleSheet("font-weight: bold; font-size: 12pt; color: #303133; margin-bottom: 10px;")
-            manual_layout.addWidget(manual_title)
-
-            manual_info = QLabel(f"文件: {manual_data['file']}")
-            manual_info.setStyleSheet("color: #606266; font-size: 10pt; margin-bottom: 10px;")
-            manual_layout.addWidget(manual_info)
-
-            manual_desc = QLabel(manual_data['description'])
-            manual_desc.setStyleSheet("color: #909399; font-size: 9pt; margin-bottom: 20px;")
-            manual_layout.addWidget(manual_desc)
-
-            open_manual_btn = QPushButton("打开硬件设计手册")
-            open_manual_btn.clicked.connect(lambda: self.open_resource_file(manual_data['file']))
-            manual_layout.addWidget(open_manual_btn)
-
-            manual_layout.addStretch()
-            self.resource_tabs.addTab(manual_tab, "📘 设计手册")
-        else:
-            no_data_label = QLabel("暂无硬件设计手册")
-            no_data_label.setAlignment(Qt.AlignCenter)
-            no_data_label.setStyleSheet("color: #909399; font-size: 10pt; padding: 20px;")
-            manual_layout.addWidget(no_data_label, 1)
-            self.resource_tabs.addTab(manual_tab, "📘 设计手册")
 
     def open_resource_file(self, file_path):
         """打开资源文件
@@ -656,6 +622,17 @@ class ConfigTab(QWidget):
 
     def on_model_changed(self, model_name):
         """模块型号变化处理"""
+        # 如果选择的是提示选项，则不处理
+        if model_name == "请选择模块型号":
+            # 重置模块信息显示
+            self.model_info_label.setText("硬件资源: 请选择模块型号")
+            # 清空资源展示区域
+            while self.resource_tabs.count() > 0:
+                self.resource_tabs.removeTab(0)
+            # 清除当前模型
+            self.current_model = None
+            return
+
         # 防止递归调用
         if self.current_model == model_name:
             return
@@ -675,7 +652,6 @@ class ConfigTab(QWidget):
         # 发送模组型号变化信号，通知其他页面
         self.model_changed.emit(model_name)
         Logger.info(f"模块型号已切换为: {model_name}", module='device_control')
-
 
     def toggle_serial(self):
         """切换串口连接状态"""

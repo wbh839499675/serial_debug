@@ -92,9 +92,14 @@ class TestExecutor(QThread):
             file_groups[case.source_file].append(case)
 
         # 计算总测试次数：每个文件执行 loop_count 次
-        total_files = len(file_groups)
-        total_iterations = total_files * self.loop_count
+        # 只计算被选中的测试用例
+        selected_cases = [case for case in self.test_cases if case.is_selected]
+        total_cases = len(selected_cases)
+        total_iterations = total_cases * self.loop_count
         current_iteration = 0
+
+        # 初始化进度
+        self.test_progress.emit(0, total_iterations)
 
         for loop in range(self.loop_count):
             self.current_loop = loop + 1
@@ -109,7 +114,6 @@ class TestExecutor(QThread):
 
             # 发送信号通知UI更新
             self.cases_reset.emit()
-            self.test_progress.emit(0, total_iterations)
 
             for file_name, cases in file_groups.items():
                 # 检查文件是否被选中

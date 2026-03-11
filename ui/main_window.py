@@ -47,6 +47,7 @@ from utils.helpers import get_system_info
 
 from ui.dialogs import CustomMessageBox
 from utils.constants import UI_NAV_ITEM_WIDTH
+from utils.version import Version
 
 # ====== 导航页面宏开关配置 ======
 ENABLE_SERIAL_DEBUG_PAGE    = True      # 启用串口调试页面
@@ -64,7 +65,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CAT1设备测试平台 v1.0 - 集成GNSS测试")
+        self.setWindowTitle(f"CAT1 ProTest Suite v{Version.get_version()}")
 
         # 设置应用图标
         icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'icons', 'app_icon.ico')
