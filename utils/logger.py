@@ -50,7 +50,7 @@ class Logger(QObject):
         Logger._main_window = window
 
     @staticmethod
-    def init_file_logging():
+    def init_logging():
         """初始化文件日志"""
         try:
             # 创建logs目录

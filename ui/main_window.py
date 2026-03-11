@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
         container_layout.setContentsMargins(20, 0, 20, 0)  # 设置左右内边距，为文字提供留白
 
         # 创建标题
-        title_label = QLabel("🚀 CAT1设备测试平台")
+        title_label = QLabel("🚀 CAT1设备测试平台 - RTOS专用")
 
         # 将标题添加到容器布局
         container_layout.addWidget(title_label)

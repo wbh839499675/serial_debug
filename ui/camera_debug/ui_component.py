@@ -11,10 +11,10 @@ from utils.constants import get_page_button_style, get_group_style
 
 class CameraUIComponents:
     """Camera调试页面UI组件"""
-    
+
     def __init__(self, parent_page):
         self.parent_page = parent_page
-    
+
     def create_serial_config_group(self):
         """创建串口配置组"""
         serial_config_group = QGroupBox("📡串口配置")
@@ -81,13 +81,13 @@ class CameraUIComponents:
 
         # 连接/断开按钮
         self.parent_page.connect_btn = QPushButton("📷连接Camera串口")
-        self.parent_page.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.parent_page.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect'))
+        self.parent_page.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.parent_page.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect', width=270))
         self.parent_page.connect_btn.clicked.connect(self.parent_page.toggle_connection)
         serial_config_layout.addRow(self.parent_page.connect_btn)
 
         return serial_config_group
-    
+
     def create_image_format_group(self):
         """创建图像格式配置组"""
         image_format_group = QGroupBox("🖼️图像格式配置")

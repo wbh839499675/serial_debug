@@ -463,10 +463,14 @@ class RelayController(QObject):
             if self.monitor_thread and self.monitor_thread.isRunning():
                 self.monitor_thread.stop()
                 self.monitor_thread = None
-
-            Logger.log("继电器监控线程已停止", "INFO")
+                Logger.log("继电器监控线程已停止", "INFO")
+                return True, "继电器监控线程已停止"
+            else:
+                Logger.log("继电器监控线程未运行", "WARNING")
+                return False, "继电器监控线程未运行"
         except Exception as e:
             Logger.log(f"停止继电器监控线程失败: {str(e)}", "ERROR")
+            return False, f"停止继电器监控线程失败: {str(e)}"
 
     def _on_monitor_status_changed(self, connected: bool):
         """处理继电器监控状态变化

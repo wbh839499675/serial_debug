@@ -311,8 +311,8 @@ class CameraDebugPage(QWidget):
             )
             self.is_connected = True
             self.connect_btn.setText("📵断开Camera连接")
-            self.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-            self.connect_btn.setStyleSheet(get_page_button_style('camera', 'disconnect'))
+            self.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            self.connect_btn.setStyleSheet(get_page_button_style('camera', 'disconnect', width=270))
 
             # 验证串口是否真正打开
             if not self.serial_port.is_open:
@@ -368,8 +368,8 @@ class CameraDebugPage(QWidget):
 
             self.is_connected = False
             self.connect_btn.setText("📷连接Camera串口")
-            self.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-            self.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect'))
+            self.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            self.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect', width=270))
 
             Logger.info(f"Camera串口 {self.port_combo.currentData()} 已断开", module='camera')
 

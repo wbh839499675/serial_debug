@@ -4,6 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QCoreApplication
 from ui.main_window import MainWindow
+from utils.logger import Logger
 from utils.version import Version
 
 # 设置为试用版
@@ -27,6 +28,8 @@ def setup_qt_environment():
 def main():
     setup_qt_environment()
     app = QApplication(sys.argv)
+
+    Logger.init_logging()
 
     # 你的主窗口代码
     window = MainWindow()
