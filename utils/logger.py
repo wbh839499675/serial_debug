@@ -109,19 +109,20 @@ class Logger(QObject):
             # 生成日志文件名
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             safe_port_name = port_name.replace(':', '_')
-            log_file_path = logs_dir / f"{safe_port_name}_{timestamp}.log"
+            log_file_path = logs_dir / f"{safe_port_name}_{timestamp}.txt"
 
             # 打开日志文件
-            log_file = open(log_file_path, 'w', encoding='utf-8')
+            log_file = open(log_file_path, 'wb')
 
             # 写入文件头
-            log_file.write(f"串口: {port_name}\n")
-            log_file.write(f"波特率: {config.get('baudrate', 115200)}\n")
-            log_file.write(f"数据位: {config.get('databits', 8)}\n")
-            log_file.write(f"停止位: {config.get('stopbits', 1)}\n")
-            log_file.write(f"校验位: {config.get('parity', 'N')}\n")
-            log_file.write(f"记录时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            log_file.write("="*80 + "\n\n")
+            header = f"串口: {port_name}\n".encode('utf-8')
+            header += f"波特率: {config.get('baudrate', 115200)}\n".encode('utf-8')
+            header += f"数据位: {config.get('databits', 8)}\n".encode('utf-8')
+            header += f"停止位: {config.get('stopbits', 1)}\n".encode('utf-8')
+            header += f"校验位: {config.get('parity', 'N')}\n".encode('utf-8')
+            header += f"记录时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n".encode('utf-8')
+            header += ("="*80 + "\r\n").encode('utf-8')
+            log_file.write(header)
             log_file.flush()
 
             # 保存文件句柄和配置
@@ -149,8 +150,10 @@ class Logger(QObject):
         if port_name in Logger.serial_log_files:
             try:
                 log_file = Logger.serial_log_files[port_name]
-                log_file.write(f"\n\n日志关闭时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                log_file.write("="*80 + "\n")
+                # 写入文件尾 - 使用bytes
+                footer = ("\n\n日志关闭时间: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n").encode('utf-8')
+                footer += ("="*80 + "\r\n").encode('utf-8')
+                log_file.write(footer)
                 log_file.close()
 
                 # 获取日志文件路径
@@ -184,11 +187,13 @@ class Logger(QObject):
 
         try:
             log_file = Logger.serial_log_files[port_name]
-            timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
-            # 根据是否为发送数据添加不同标记
-            prefix = "发送" if is_sent else "接收"
-            log_file.write(f"[{timestamp}] {prefix}: {data}\n")
+            # 如果是字符串，转换为字节
+            if isinstance(data, str):
+                data_bytes = data.encode('latin-1')
+            else:
+                data_bytes = data
+            log_file.write(data_bytes)
             log_file.flush()
             return True
 

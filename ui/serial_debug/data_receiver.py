@@ -58,11 +58,11 @@ class DataReceiver(QObject):
         """处理接收到的数据"""
         if not data or self.pause_recv:
             return
-        
+
         # 更新统计
         self.total_recv_bytes += len(data)
         self._update_recv_rate()
-        
+
         # 将数据解码并添加到缓冲区
         try:
             data_str = data.decode('utf-8', errors='ignore')
@@ -70,21 +70,22 @@ class DataReceiver(QObject):
         except Exception as e:
             Logger.log(f"数据解码失败: {str(e)}", "ERROR")
             return
-        
-        # 处理完整的行
+
+        # 处理完整的行 - 保留空行
         lines = self.receive_buffer.split('\n')
         for line in lines[:-1]:
-            if line.strip():
-                display_data = self._format_data(line.encode('utf-8'))
-                self._display_data(display_data)
-        
+            # 格式化数据
+            display_data = self._format_data(line.encode('utf-8'))
+            self._display_data(display_data)
+
         # 保存不完整的行
         self.receive_buffer = lines[-1]
-        
-        # 发送信号 - 确保这个信号不会再次触发process_data
-        self.data_received.emit(data_str)
-        self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)
 
+        # 发送信号 - 一次性发送所有数据
+        complete_data = '\n'.join(lines[:-1])
+        if complete_data:
+            self.data_received.emit(complete_data)
+        self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)
 
     def _format_data(self, data: bytes) -> str:
         """格式化数据"""
@@ -111,9 +112,9 @@ class DataReceiver(QObject):
 
         # 自动滚动
         if self.auto_scroll:
-            self.recv_text.verticalScrollBar().setValue(
-                self.recv_text.verticalScrollBar().maximum()
-            )
+            cursor = self.recv_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self.recv_text.setTextCursor(cursor)
 
     def _update_recv_rate(self) -> None:
         """更新接收速率"""

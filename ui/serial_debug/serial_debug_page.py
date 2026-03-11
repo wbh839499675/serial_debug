@@ -889,6 +889,13 @@ class SerialDebugTab(QWidget):
 
     def _on_data_received(self, data: str):
         """数据接收处理"""
+        # 写入日志文件
+        if self.auto_save_check.isChecked:
+            if not data.endswith('\n'):
+                data = data + '\n'
+            Logger.write_serial_log(self.port_name, data, is_sent=False)
+        print(f"接收到数据: {data}")
+
         self.data_received.emit(data)
 
     def _on_recv_stats_updated(self, total_bytes: int, rate: float):
