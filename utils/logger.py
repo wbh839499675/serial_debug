@@ -487,7 +487,7 @@ class Logger(QObject):
                     del Logger._flush_timers[widget]
 
                 # 打印错误到控制台
-                print(f"[{timestamp}] {level}: {text}")
+                #print(f"[{timestamp}] {level}: {text}")
                 print(f"日志输出失败: {str(e)}")
         else:
             # 如果没有widget，打印到控制台

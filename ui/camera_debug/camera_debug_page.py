@@ -402,7 +402,7 @@ class CameraDebugPage(QWidget):
                 scan_magic_bytes = SCAN_MAGIC.to_bytes(4, byteorder='little')
 
                 if scan_magic_bytes in data:
-                    Logger.debug("检测到扫码数据头，将数据传递给扫码解析线程", module='camera')
+                    Logger.debug("检测到扫码数据头0xAA55AA56,将数据传递给扫码解析线程", module='camera')
                     self.scan_parser_thread.add_data(data)
 
             # 同时更新数据统计

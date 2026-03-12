@@ -155,7 +155,7 @@ class CameraUIComponents:
         image_format_layout.addRow(self.parent_page.frame_sync_check)
 
         return image_format_group
-    
+
     def create_image_info_group(self):
         """创建图像信息显示组"""
         image_info_group = QGroupBox("📊图像信息")
@@ -179,7 +179,7 @@ class CameraUIComponents:
         image_info_layout.addRow("数据率", self.parent_page.data_rate_label)
 
         return image_info_group
-    
+
     def create_control_group(self):
         """创建图像控制按钮组"""
         control_group = QGroupBox("🎮图像控制")
@@ -208,7 +208,7 @@ class CameraUIComponents:
         control_layout.addWidget(self.parent_page.clear_image_btn)
 
         return control_group
-    
+
     def create_scan_control_group(self):
         """创建扫码控制组"""
         scan_control_group = QGroupBox("📱扫码控制")
@@ -239,7 +239,7 @@ class CameraUIComponents:
         scan_control_layout.addLayout(button_layout)
 
         return scan_control_group
-    
+
     def create_preview_group(self):
         """创建图像预览区"""
         preview_group = QGroupBox("📺图像预览")

@@ -122,10 +122,19 @@ class ScanParserThread(QThread):
                 Logger.debug(f"[扫码解析] 检查数据头魔数: 0x{scan_magic:08X} (期望: 0x{SCAN_MAGIC:08X})", module='camera')
 
                 if scan_magic != SCAN_MAGIC:
-                    # 不是扫码数据头,保留最后7字节后退出
-                    Logger.debug(f"[扫码解析] 数据头魔数不匹配, 保留最后{SCAN_HEADER_SIZE-1}字节, 继续搜索", module='camera')
-                    self.image_buffer = self.image_buffer[-(SCAN_HEADER_SIZE-1):] if len(self.image_buffer) >= SCAN_HEADER_SIZE-1 else bytearray()
-                    return  # 修改: 直接返回而不是break
+                    # 不是扫码数据头，逐字节搜索
+                    Logger.debug(f"[扫码解析] 数据头魔数不匹配, 逐字节搜索", module='camera')
+                    # 找到下一个可能的魔数位置
+                    magic_bytes = SCAN_MAGIC.to_bytes(4, byteorder='little')
+                    found_idx = self.image_buffer.find(magic_bytes, 1)  # 从第1字节开始搜索
+
+                    if found_idx != -1:
+                        # 找到魔数，丢弃前面的数据
+                        self.image_buffer = self.image_buffer[found_idx:]
+                    else:
+                        # 未找到魔数，保留最后3字节（避免跨包魔数被截断）
+                        self.image_buffer = self.image_buffer[-3:] if len(self.image_buffer) >= 3 else bytearray()
+                        return  # 数据不足，等待更多数据
 
                 # 解析扫码数据头
                 scan_ret = int.from_bytes(self.image_buffer[4:5], byteorder='little', signed=True)

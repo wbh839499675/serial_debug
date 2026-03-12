@@ -35,7 +35,7 @@ class SerialReader(QObject):
                 if self.serial_port and self.serial_port.is_open:
                     if self.serial_port.in_waiting > 0:
                         data = self.serial_port.read(self.serial_port.in_waiting)
-                        Logger.log(f"接收到数据---: {data if data else '空'}", "DEBUG")
+                        #Logger.log(f"接收到数据: {data if data else '空'}", "DEBUG")
                         self.data_received.emit(data)
                     else:
                         # 减少休眠时间，提高响应速度

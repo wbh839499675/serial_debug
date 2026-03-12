@@ -37,6 +37,7 @@ from ui.serial_debug.serial_debug_page import SerialDebugPage
 from ui.camera_debug.camera_debug_page import CameraDebugPage
 from ui.device_test.device_test_page import DeviceTestPage
 from ui.gnss_test.gnss_test_page import GNSSTestPage
+from ui.feedback.feedback_page import FeedbackPage
 
 from ui.power_analysis.power_analysis_page import PowerAnalysisPage
 from ui.oscilloscope_page import OscilloscopePage
@@ -56,6 +57,7 @@ ENABLE_GNSS_PAGE            = False      # 启用GNSS测试页面
 ENABLE_DEVICE_TEST_PAGE     = True      # 启用设备测试页面
 ENABLE_POWER_ANALYSIS_PAGE  = False      # 启用功耗分析页面
 ENABLE_OSCILLOSCOPE_PAGE    = False      # 启用虚拟示波器页面
+ENABLE_FEEDBACK_PAGE        = True      # 启用反馈页面
 
 class MainWindow(QMainWindow):
     """主窗口类"""
@@ -240,7 +242,8 @@ class MainWindow(QMainWindow):
             "🛰️ GNSS测试": GNSSTestPage,
             "🎛️ 设备测试": DeviceTestPage,
             "⚡ 功耗分析": PowerAnalysisPage,
-            "📺 虚拟示波器": OscilloscopePage
+            "📺 虚拟示波器": OscilloscopePage,
+            "👤 问题反馈": FeedbackPage
         }
 
         # 页面名称映射字典
@@ -250,7 +253,8 @@ class MainWindow(QMainWindow):
             "🛰️ GNSS测试": "gnss",
             "🎛️ 设备测试": "device_test",
             "⚡ 功耗分析": "power_analysis",
-            "📺 虚拟示波器": "oscilloscope"
+            "📺 虚拟示波器": "oscilloscope",
+            "👤 问题反馈": "feedback"
         }
 
         # 导航按钮字典 - 使用宏开关控制
@@ -269,6 +273,8 @@ class MainWindow(QMainWindow):
             nav_buttons_dict["⚡ 功耗分析"] = self.show_power_analysis_page
         if ENABLE_OSCILLOSCOPE_PAGE:
             nav_buttons_dict["📺 虚拟示波器"] = self.show_oscilloscope_page
+        if ENABLE_FEEDBACK_PAGE:
+            nav_buttons_dict["👤 问题反馈"] = self.show_feedback_page
 
         self.nav_buttons_dict = {}  # 存储按钮对象与回调函数的映射
         for text, callback in nav_buttons_dict.items():
@@ -387,6 +393,11 @@ class MainWindow(QMainWindow):
         """显示虚拟示波器页面"""
         self.stacked_widget.setCurrentWidget(self.oscilloscope_page)
         self.update_nav_buttons(self.show_oscilloscope_page)
+
+    def show_feedback_page(self):
+        """显示反馈页面"""
+        self.stacked_widget.setCurrentWidget(self.feedback_page)
+        self.update_nav_buttons(self.show_feedback_page)
 
     def update_nav_buttons(self, callback):
         """更新导航按钮状态"""

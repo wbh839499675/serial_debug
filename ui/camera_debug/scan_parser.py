@@ -5,10 +5,10 @@ from utils.logger import Logger
 
 class ScanParser:
     """扫码解析器"""
-    
+
     def __init__(self, parent_page):
         self.parent_page = parent_page
-    
+
     def process_scan_data(self, data: bytes):
         """处理扫码数据"""
         try:
