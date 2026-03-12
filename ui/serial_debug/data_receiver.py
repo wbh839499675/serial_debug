@@ -78,6 +78,10 @@ class DataReceiver(QObject):
             display_data = self._format_data(line.encode('utf-8'))
             self._display_data(display_data)
 
+        # 在帧尾添加空行
+        if lines[:-1] and self.recv_text:
+            self.recv_text.append('')
+
         # 保存不完整的行
         self.receive_buffer = lines[-1]
 
@@ -96,6 +100,12 @@ class DataReceiver(QObject):
     def _display_data(self, data: str) -> None:
         """显示数据"""
         if not self.recv_text:
+            return
+
+        # 检查是否为空行或仅包含空白字符
+        if not data.strip():
+            # 空行直接显示，不添加时间戳和前缀
+            self.recv_text.append('')
             return
 
         display_data = data

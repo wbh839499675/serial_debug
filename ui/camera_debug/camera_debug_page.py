@@ -25,10 +25,9 @@ from utils.constants import get_page_button_style
 from utils.constants import get_group_style
 import time
 from datetime import datetime
-
 from .camera_thread import ImageParserThread, ScanParserThread
 from .image_processor import ImageProcessor
-from .scan_parser import ScanParser
+#from .scan_parser import ScanParser
 from .ui_component import CameraUIComponents
 
 # ==================== Camera调试页面 ====================
@@ -69,7 +68,7 @@ class CameraDebugPage(QWidget):
 
         # 初始化处理器
         self.image_processor = ImageProcessor(self)
-        self.scan_parser = ScanParser(self)
+        #self.scan_parser = ScanParser(self)
         self.ui_components = CameraUIComponents(self)
 
         # 初始化线程
@@ -78,8 +77,8 @@ class CameraDebugPage(QWidget):
 
         self.init_ui()
 
-        # 初始化UI之后再设置日志输出目标
-        Logger.set_log_target('camera', self.log_text)
+        # 初始化UI之后再设置日志输出目标, 使用缓冲机制
+        Logger.set_log_target('camera', self.log_text, buffer_size=1, flush_interval=0)
 
     def closeEvent(self, event):
         """窗口关闭事件"""
@@ -402,12 +401,14 @@ class CameraDebugPage(QWidget):
                 scan_magic_bytes = SCAN_MAGIC.to_bytes(4, byteorder='little')
 
                 if scan_magic_bytes in data:
-                    Logger.debug("检测到扫码数据头0xAA55AA56,将数据传递给扫码解析线程", module='camera')
+                    #Logger.debug("检测到扫码数据头", module='camera')
                     self.scan_parser_thread.add_data(data)
 
             # 同时更新数据统计
             self.total_bytes += len(data)
 
+            # 不在接收区面板上显示图像数据！！！！
+            """
             try:
                 data_str = data.decode('utf-8', errors='ignore')
                 self.receive_buffer += data_str
@@ -421,6 +422,7 @@ class CameraDebugPage(QWidget):
                 self.receive_buffer = lines[-1]
             except Exception as e:
                 Logger.error(f"显示接收数据失败: {str(e)}", module='camera')
+            """
             return
 
         # 非图像采集模式，处理文本数据
@@ -478,7 +480,7 @@ class CameraDebugPage(QWidget):
             display_data = f"[{timestamp}] {display_data}"
 
         # 添加到数据框
-        self.data_text.append(display_data)
+        #self.data_text.append(display_data)
 
         # 自动滚动
         if self.auto_scroll_check.isChecked():
@@ -641,7 +643,7 @@ class CameraDebugPage(QWidget):
                     timestamp = int.from_bytes(self.image_buffer[20:24], byteorder='little')
 
                     # 打印帧头信息
-                    Logger.debug(f"接收到帧头: 魔数=0x{magic:08X}, 帧大小={frame_size}, 宽度={width}, 高度={height}, 格式=0x{format_code:08X}, 时间戳={timestamp}", module='camera')
+                    #Logger.debug(f"接收到帧头: 魔数=0x{magic:08X}, 帧大小={frame_size}, 宽度={width}, 高度={height}, 格式=0x{format_code:08X}, 时间戳={timestamp}", module='camera')
 
                     # 验证帧头魔数
                     if magic != FRAME_HEADER_MAGIC:
@@ -997,47 +999,6 @@ class CameraDebugPage(QWidget):
             cursor = self.scan_history_text.textCursor()
             cursor.movePosition(QTextCursor.Start)
             cursor.movePosition(QTextCursor.Down, QTextCursor.KeepAnchor, 10)
-            cursor.removeSelectedText()
-
-    def append_log(self, level: str, message: str):
-        """添加日志到日志显示框"""
-        if not message:
-            return
-
-        # 添加时间戳
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-
-        # 根据日志级别设置颜色
-        if level == "INFO":
-            color = "#00ff00"  # 绿色
-        elif level == "ERROR":
-            color = "#ff0000"  # 红色
-        elif level == "WARNING":
-            color = "#ffaa00"  # 橙色
-        elif level == "DEBUG":
-            color = "#888888"  # 灰色
-        else:
-            color = "#d4d4d4"  # 默认颜色
-
-        # 格式化日志消息
-        log_message = f'<span style="color: {color}">[{timestamp}] [{level}] {message}</span>'
-
-        # 添加到日志框
-        self.log_text.append(log_message)
-
-        # 自动滚动
-        if self.auto_scroll_log_check.isChecked():
-            cursor = self.log_text.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self.log_text.setTextCursor(cursor)
-
-        # 限制显示行数
-        if self.log_text.document().blockCount() > self.max_log_lines:
-            cursor = self.log_text.textCursor()
-            cursor.movePosition(QTextCursor.Start)
-            cursor.movePosition(QTextCursor.Down, QTextCursor.KeepAnchor, 100)
-            cursor.select(QTextCursor.Document)
             cursor.removeSelectedText()
 
     def clear_log(self):

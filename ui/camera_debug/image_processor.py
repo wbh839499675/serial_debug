@@ -24,7 +24,7 @@ class ImageProcessor:
                 expected_size = self.parent_page.image_width * self.parent_page.image_height
             else:
                 expected_size = self.parent_page.image_width * self.parent_page.image_height * 2
-            Logger.debug(f"处理YUV422数据: 接收长度={len(data_array)}, 预期长度={expected_size}, 图像尺寸={self.parent_page.image_width}x{self.parent_page.image_height}", module='camera')
+            #Logger.debug(f"处理YUV422数据: 接收长度={len(data_array)}, 预期长度={expected_size}, 图像尺寸={self.parent_page.image_width}x{self.parent_page.image_height}", module='camera')
 
             # 检查数据长度是否足够
             if len(data_array) < expected_size:
@@ -48,7 +48,7 @@ class ImageProcessor:
                     # 将灰度图像转换为RGB格式（R=G=B=灰度值）
                     rgb = np.dstack((gray, gray, gray)).astype(np.uint8)
 
-                    Logger.debug(f"处理为灰度图像: 形状={rgb.shape}", module='camera')
+                    #Logger.debug(f"处理为灰度图像: 形状={rgb.shape}", module='camera')
 
                     # 更新图像显示
                     self.parent_page.update_image_display(rgb)
@@ -56,7 +56,7 @@ class ImageProcessor:
                     # 更新帧计数
                     self.parent_page.frame_count += 1
 
-                    Logger.debug(f"成功处理并显示灰度图像", module='camera')
+                    #Logger.debug(f"成功处理并显示灰度图像", module='camera')
 
                 except Exception as e:
                     Logger.error(f"灰度图像处理失败: {str(e)}", module='camera')

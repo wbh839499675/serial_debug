@@ -146,5 +146,9 @@
     {
         "command": "AT+MGPSNMEA=\"GGA\"",
         "delay": "1000"
+    },
+    {
+        "command": "AT+MGPS=1,30,1000,65535",
+        "delay": "1000"
     }
 ]

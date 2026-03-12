@@ -341,8 +341,8 @@ class Logger(QObject):
         color = Logger.get_log_color(level)
 
         # 在监控相关的日志前添加标识
-        if any(keyword in message for keyword in ['监控', '恢复', '死机', '初始化', '重启']):
-            message = f"[监控] {message}"
+        #if any(keyword in message for keyword in ['监控', '恢复', '死机', '初始化', '重启']):
+        #    message = f"[监控] {message}"
 
         # 格式化日志消息
         formatted_message = f'<span style="color:{color}">[{timestamp}] [{level}] {message}</span>'

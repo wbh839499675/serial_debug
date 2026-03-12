@@ -112,7 +112,7 @@ class CameraUIComponents:
         self.parent_page.image_type_combo = QComboBox()
         self.parent_page.image_type_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.parent_page.image_type_combo.setStyleSheet("font-size: 9pt; color: #333333;")
-        self.parent_page.image_type_combo.addItems(["彩色图像", "灰度图像"])
+        self.parent_page.image_type_combo.addItems(["彩色图像","灰度图像"])
         self.parent_page.image_type_combo.setCurrentText("彩色图像")
         self.parent_page.image_type_combo.currentTextChanged.connect(self.parent_page.update_image_type)
         image_type_label = QLabel("图像类型")
@@ -123,7 +123,7 @@ class CameraUIComponents:
         self.parent_page.image_size_combo = QComboBox()
         self.parent_page.image_size_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.parent_page.image_size_combo.setStyleSheet("font-size: 9pt; color: #333333;")
-        self.parent_page.image_size_combo.addItems(["VGA (640x480)", "QVGA (320x240)"])
+        self.parent_page.image_size_combo.addItems(["QVGA (320x240)", "VGA (640x480)"])
         self.parent_page.image_size_combo.currentIndexChanged.connect(self.parent_page.update_image_size)
         image_size_label = QLabel("图像尺寸")
         image_size_label.setStyleSheet("font-size: 9pt; background-color: transparent;")
@@ -263,7 +263,7 @@ class CameraUIComponents:
         preview_layout.addWidget(self.parent_page.image_label, 0, Qt.AlignLeft | Qt.AlignTop)  # 靠左上角显示
 
         return preview_group
-    
+
     def create_scan_result_group(self):
         """创建扫码结果显示区"""
         scan_result_group = QGroupBox("📱扫码结果")
@@ -445,7 +445,7 @@ class CameraUIComponents:
         scan_result_layout.addWidget(self.parent_page.scan_history_text)
 
         return scan_result_group
-    
+
     def create_log_group(self):
         """创建日志显示区"""
         log_group = QGroupBox("📜运行日志")
@@ -510,7 +510,7 @@ class CameraUIComponents:
                 font-family: 'Consolas', monospace;
                 font-size: 9pt;
                 background-color: #1e1e1e;
-                color: #d4d4d4;
+                color: #ffffff;
                 border: 1px solid #dcdfe6;
                 border-radius: 4px;
                 padding: 5px;
@@ -519,7 +519,7 @@ class CameraUIComponents:
         log_layout.addWidget(self.parent_page.log_text)
 
         return log_group
-    
+
     def create_data_group(self):
         """创建数据接收区"""
         data_group = QGroupBox("📥数据接收")

@@ -110,31 +110,41 @@ class ScanParserThread(QThread):
             # 将数据添加到缓存中
             self.image_buffer.extend(data)
 
-            # 扫码数据头至少8字节
+            Logger.debug(f"[扫码解析] 缓冲区数据: {self.image_buffer.hex(' ')} (共{len(self.image_buffer)}字节)", module='camera')
+
+            # 扫码数据头结构
+            # u32 magic;       // 4字节
+            # u8 scan_ret;      // 1字节
+            # u8 result_length; // 1字节
+            # u8 type;         // 1字节
             SCAN_HEADER_SIZE = 8
             SCAN_MAGIC = 0xAA55AA56
-
-            Logger.debug(f"[扫码解析] 开始处理扫码数据, 接收数据={len(data)}字节, 缓冲区总大小={len(self.image_buffer)}字节", module='camera')
 
             while len(self.image_buffer) >= SCAN_HEADER_SIZE:
                 # 检查扫码数据头魔数
                 scan_magic = int.from_bytes(self.image_buffer[0:4], byteorder='little')
-                Logger.debug(f"[扫码解析] 检查数据头魔数: 0x{scan_magic:08X} (期望: 0x{SCAN_MAGIC:08X})", module='camera')
 
                 if scan_magic != SCAN_MAGIC:
                     # 不是扫码数据头，逐字节搜索
                     Logger.debug(f"[扫码解析] 数据头魔数不匹配, 逐字节搜索", module='camera')
                     # 找到下一个可能的魔数位置
                     magic_bytes = SCAN_MAGIC.to_bytes(4, byteorder='little')
-                    found_idx = self.image_buffer.find(magic_bytes, 1)  # 从第1字节开始搜索
+
+                    # 修改：从位置1开始搜索，保留当前位置的数据
+                    found_idx = self.image_buffer.find(magic_bytes, 1)
 
                     if found_idx != -1:
                         # 找到魔数，丢弃前面的数据
                         self.image_buffer = self.image_buffer[found_idx:]
+                        Logger.debug(f"[扫码解析] 找到魔数，丢弃前面的{found_idx}字节", module='camera')
                     else:
-                        # 未找到魔数，保留最后3字节（避免跨包魔数被截断）
-                        self.image_buffer = self.image_buffer[-3:] if len(self.image_buffer) >= 3 else bytearray()
-                        return  # 数据不足，等待更多数据
+                        # 未找到魔数，保留最后7字节（SCAN_HEADER_SIZE-1）
+                        # 但如果缓冲区小于SCAN_HEADER_SIZE，保留全部数据
+                        if len(self.image_buffer) >= SCAN_HEADER_SIZE:
+                            self.image_buffer = self.image_buffer[-(SCAN_HEADER_SIZE-1):]
+                            Logger.debug(f"[扫码解析] 未找到魔数，保留最后{SCAN_HEADER_SIZE-1}字节", module='camera')
+                        # 数据不足，等待更多数据
+                        return
 
                 # 解析扫码数据头
                 scan_ret = int.from_bytes(self.image_buffer[4:5], byteorder='little', signed=True)
@@ -153,17 +163,16 @@ class ScanParserThread(QThread):
 
                 # 获取码制类型名称
                 type_name = scan_type_map.get(scan_type, f"UNKNOWN({scan_type})")
-                Logger.debug(f"[扫码解析] 码制类型名称: {type_name}", module='camera')
 
                 # 计算完整扫码数据包大小
                 total_scan_size = SCAN_HEADER_SIZE + result_length
-                Logger.debug(f"[扫码解析] 完整扫码数据包大小: {total_scan_size}字节 (头8字节 + 数据{result_length}字节)", module='camera')
 
                 # 检查是否有足够的数据
                 if len(self.image_buffer) < total_scan_size:
                     # 数据不足,等待更多数据
                     Logger.debug(f"[扫码解析] 数据不足,当前={len(self.image_buffer)}字节,需要={total_scan_size}字节,等待更多数据", module='camera')
-                    return  # 修改: 直接返回而不是break
+                    Logger.debug(f"[扫码解析] 当前缓冲区数据: {self.image_buffer.hex(' ')}", module='camera')
+                    return
 
                 # 解析扫码结果
                 if scan_ret == 0:
@@ -192,10 +201,16 @@ class ScanParserThread(QThread):
                 self.scan_result_ready.emit(result_data, type_name, success)
 
                 # 从缓冲区移除已处理的扫码数据
-                Logger.debug(f"[扫码解析] 从缓冲区移除已处理的{total_scan_size}字节扫码数据", module='camera')
                 self.image_buffer = self.image_buffer[total_scan_size:]
 
-            Logger.debug(f"[扫码解析] 扫码数据处理完成, 剩余缓冲区大小={len(self.image_buffer)}字节", module='camera')
+                # 检查剩余数据是否包含完整的扫码数据头
+                if len(self.image_buffer) >= SCAN_HEADER_SIZE:
+                    # 检查剩余数据开头是否是有效的扫码数据头
+                    next_magic = int.from_bytes(self.image_buffer[0:4], byteorder='little')
+                    if next_magic != SCAN_MAGIC:
+                        # 不是有效的扫码数据头，可能是图像数据，清空缓冲区
+                        Logger.debug(f"[扫码解析] 剩余数据开头不是有效的扫码数据头，清空缓冲区", module='camera')
+                        self.image_buffer = bytearray()
 
         except Exception as e:
             Logger.error(f"[扫码解析] 处理扫码数据失败: {str(e)}", module='camera')
