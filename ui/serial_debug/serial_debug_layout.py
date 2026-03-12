@@ -202,6 +202,18 @@ class SerialDebugTabLayout:
             }
         """)
 
+        # 添加波形图显示选项
+        waveform_check = QCheckBox("波形图显示")
+        waveform_check.setChecked(False)
+
+        # 添加数据录制选项
+        record_btn = QPushButton("⏺ 开始录制")
+        record_btn.setStyleSheet(get_page_button_style('serial_debug', 'record'))
+
+        # 添加数据回放选项
+        playback_btn = QPushButton("▶️ 开始回放")
+        playback_btn.setStyleSheet(get_page_button_style('serial_debug', 'playback'))
+        playback_btn.setEnabled(False)
 
         clear_recv_btn = QPushButton("🗑 清除")
         #clear_recv_btn.setStyleSheet(get_page_button_style('serial_debug', 'clear'))
@@ -227,7 +239,10 @@ class SerialDebugTabLayout:
             'show_line_numbers': show_line_numbers_check,
             'auto_save': auto_save_check,
             'clear': clear_recv_btn,
-            'search': search_btn
+            'search': search_btn,
+            'waveform': waveform_check,
+            'record': record_btn,
+            'playback': playback_btn
         }
 
     @staticmethod

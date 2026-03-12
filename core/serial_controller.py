@@ -66,8 +66,8 @@ class SerialController(QObject):
         # 添加串口参数属性
         self.baudrate = 115200
         self.databits = 8
-        self.parity = 'N'
         self.stopbits = 1
+        self.parity = 'None'
 
     def is_connected(self) -> bool:
         """检查串口连接状态"""

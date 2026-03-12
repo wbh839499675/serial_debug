@@ -565,20 +565,20 @@ class ConfigTab(QWidget):
         if self.serial_controller and self.serial_controller.is_connected:
             baudrate = self.serial_controller.baudrate
             databits = self.serial_controller.databits
-            parity = self.serial_controller.parity
             stopbits = self.serial_controller.stopbits
+            parity = self.serial_controller.parity
         else:
             # 使用默认值
             baudrate = 115200
             databits = 8
-            parity = 'N'
             stopbits = 1
+            parity = 'None'
 
         dialog = SerialConfigDialog(
             baudrate=baudrate,
             databits=databits,
-            parity=parity,
             stopbits=stopbits,
+            parity=parity,
             parent=self
         )
 
@@ -676,14 +676,14 @@ class ConfigTab(QWidget):
         if self.serial_controller and self.serial_controller.is_connected:
             baudrate = self.serial_controller.baudrate
             data_bits = self.serial_controller.databits
-            parity = self.serial_controller.parity
             stop_bits = self.serial_controller.stopbits
+            parity = self.serial_controller.parity
         else:
             # 使用默认值
             baudrate = 115200
             data_bits = 8
-            parity = 'N'
             stop_bits = 1
+            parity = 'None'
 
         # 连接串口
         if self.serial_controller:

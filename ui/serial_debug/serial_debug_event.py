@@ -122,6 +122,17 @@ class SerialDebugTabEvents:
         )
         if dialog.exec_() == QDialog.Accepted:
             config = dialog.get_config()
+
+            # 检查配置参数是否发生变化
+            config_changed = (
+                self.tab.baudrate != config['baudrate'] or
+                self.tab.databits != config['databits'] or
+                self.tab.parity != config['parity'] or
+                self.tab.stopbits != config['stopbits'] or
+                self.tab.rtscts != config['rtscts']
+            )
+
+            # 更新配置参数
             self.tab.baudrate = config['baudrate']
             self.tab.databits = config['databits']
             self.tab.parity = config['parity']
@@ -139,9 +150,19 @@ class SerialDebugTabEvents:
                 }
                 Logger.init_serial_logging(self.tab.port_name, new_config)
 
-            # 如果已连接，重新连接以应用新配置
-            if self.tab.is_connected:
-                self.tab._on_toggle_connection()
+            # 只有在已连接状态下才重新连接以应用新配置
+            if self.tab.is_connected and config_changed:
+                # 先断开当前连接
+                self.tab.serial_manager.disconnect()
+                # 使用新配置重新连接
+                self.tab.serial_manager.connect(
+                    self.tab.port_name,
+                    self.tab.baudrate,
+                    self.tab.databits,
+                    self.tab.stopbits,
+                    self.tab.parity,
+                    self.tab.rtscts
+                )
 
     def on_toggle_connection(self):
         """切换连接状态"""

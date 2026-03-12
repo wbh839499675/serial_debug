@@ -25,7 +25,7 @@ class SerialPortManager(QObject):
         self.baudrate = 115200
         self.databits = 8
         self.stopbits = 1
-        self.parity = 'N'
+        self.parity = 'None'
         self.rtscts = False
         self._is_connected = False
         self.auto_reconnect = True
@@ -38,7 +38,7 @@ class SerialPortManager(QObject):
 
     def connect(self, port_name: str, baudrate: int = 115200,
            databits: int = 8, stopbits: float = 1,
-           parity: str = 'N', rtscts: bool = False) -> bool:
+           parity: str = 'None', rtscts: bool = False) -> bool:
         """连接串口"""
         try:
             # 如果已连接，先断开

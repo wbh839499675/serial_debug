@@ -298,17 +298,9 @@ class SerialDebugPage(QWidget):
             if tab.is_connected:
                 connected_count += 1
                 # 构建每个连接设备的详细信息
-                parity_map = {
-                    serial.PARITY_NONE: 'N',
-                    serial.PARITY_EVEN: 'E',
-                    serial.PARITY_ODD: 'O',
-                    serial.PARITY_MARK: 'M',
-                    serial.PARITY_SPACE: 'S'
-                }
-                parity_char = parity_map.get(tab.parity, 'N')
-                rtscts_text = "RTS/CTS" if tab.rtscts else "无流控"
+                rtscts_text = "HardWare" if tab.rtscts else "None"
 
-                device_info = f"{port}: {tab.baudrate},{tab.databits},{parity_char},{tab.stopbits},{rtscts_text}"
+                device_info = f"{port}: {tab.baudrate},{tab.databits},{tab.stopbits},{tab.parity},{rtscts_text}"
                 status_messages.append(device_info)
                 Logger.log(f"端口 {port} 已连接", "DEBUG")
             else:
@@ -332,7 +324,7 @@ class SerialDebugTab(QWidget):
     data_received = pyqtSignal(str)  # 接收到数据信号
 
     def __init__(self, port_name: str="", baudrate: int = 115200, databits: int = 8,
-                 stopbits: float = 1, parity: str = 'N', parent=None):
+                 stopbits: float = 1, parity: str = 'None', parent=None):
         super().__init__(parent)
         self.parent = parent
         self.port_name = port_name

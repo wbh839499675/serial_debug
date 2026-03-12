@@ -35,7 +35,7 @@ class ConfigManager:
                 'baudrate': 115200,
                 'databits': 8,
                 'stopbits': 1,
-                'parity': 'N',
+                'parity': 'None',
                 'timeout': 1
             },
             'relay': {

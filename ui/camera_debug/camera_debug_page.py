@@ -304,8 +304,8 @@ class CameraDebugPage(QWidget):
                 port=self.port_combo.currentData(),
                 baudrate=int(self.baudrate_combo.currentText()),
                 bytesize=int(self.databits_combo.currentText()),
-                parity=parity,
                 stopbits=float(self.stopbits_combo.currentText()),
+                parity=parity,
                 timeout=1
             )
             self.is_connected = True

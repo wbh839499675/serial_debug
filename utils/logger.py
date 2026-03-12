@@ -119,7 +119,7 @@ class Logger(QObject):
             header += f"波特率: {config.get('baudrate', 115200)}\r\n".encode('utf-8')
             header += f"数据位: {config.get('databits', 8)}\r\n".encode('utf-8')
             header += f"停止位: {config.get('stopbits', 1)}\r\n".encode('utf-8')
-            header += f"校验位: {config.get('parity', 'N')}\r\n".encode('utf-8')
+            header += f"校验位: {config.get('parity', 'None')}\r\n".encode('utf-8')
             header += f"记录时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\r\n".encode('utf-8')
             header += ("="*80 + "\r\n").encode('utf-8')
             log_file.write(header)

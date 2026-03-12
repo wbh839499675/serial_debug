@@ -16,8 +16,11 @@ from PyQt5.QtCore import Qt, QTimer, QDateTime, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QBrush, QMovie, QTextCursor, QTextCharFormat
 from datetime import datetime
 
-from utils.constants import get_dialog_style
-from utils.constants import get_custom_dialog_style
+from utils.constants import (
+    get_dialog_style, get_combobox_style, get_custom_dialog_style,
+    get_button_style
+)
+
 from utils.logger import Logger
 
 from utils.constants import CAT1_AT_COMMANDS
@@ -81,11 +84,11 @@ class SerialConfigDialog(QDialog):
                 font-size: 20pt;
                 color: #909399;
                 padding: 0;
+                border-radius: 4px;
             }
             QPushButton:hover {
                 background-color: #f56c6c;
                 color: white;
-                border-radius: 4px;
             }
         """)
         close_btn.clicked.connect(self.reject)
@@ -110,7 +113,7 @@ class SerialConfigDialog(QDialog):
 
         # 波特率
         self.baudrate_combo = QComboBox()
-        self.baudrate_combo.setStyleSheet("font-size: 9pt; color: #333333;")
+        self.baudrate_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.baudrate_combo.addItems(["4800", "9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1000000", "2000000", "3000000"])
         self.baudrate_combo.setCurrentText(str(self.baudrate))
         self.baudrate_combo.setFixedHeight(32)
@@ -119,7 +122,7 @@ class SerialConfigDialog(QDialog):
 
         # 数据位
         self.databits_combo = QComboBox()
-        self.databits_combo.setStyleSheet("font-size: 9pt; color: #333333;")
+        self.databits_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.databits_combo.addItems(["5", "6", "7", "8"])
         self.databits_combo.setFixedHeight(32)
         self.databits_combo.setCurrentText(str(self.databits))
@@ -127,7 +130,7 @@ class SerialConfigDialog(QDialog):
 
         # 校验位
         self.parity_combo = QComboBox()
-        self.parity_combo.setStyleSheet("font-size: 9pt; color: #333333;")
+        self.parity_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.parity_combo.addItems(["None", "Even", "Odd", "Mark", "Space"])
         self.parity_combo.setFixedHeight(32)
         self.parity_combo.setCurrentText(self.parity)
@@ -135,7 +138,7 @@ class SerialConfigDialog(QDialog):
 
         # 停止位
         self.stopbits_combo = QComboBox()
-        self.stopbits_combo.setStyleSheet("font-size: 9pt; color: #333333;")
+        self.stopbits_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.stopbits_combo.addItems(["1", "1.5", "2"])
         self.stopbits_combo.setFixedHeight(32)
         self.stopbits_combo.setCurrentText(str(self.stopbits))
@@ -165,13 +168,13 @@ class SerialConfigDialog(QDialog):
 
         ok_btn = QPushButton("确定")
         ok_btn.setObjectName("ok_btn")
-        ok_btn.setMinimumWidth(80)
+        ok_btn.setStyleSheet(get_button_style('success', 'small'))
         ok_btn.clicked.connect(self.accept)
         button_layout.addWidget(ok_btn)
 
         cancel_btn = QPushButton("取消")
         cancel_btn.setObjectName("cancel_btn")
-        cancel_btn.setMinimumWidth(80)
+        cancel_btn.setStyleSheet(get_button_style('warning', 'small'))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
@@ -1052,7 +1055,7 @@ class LogSearchDialog(QDialog):
 
         # 搜索框
         search_layout = QHBoxLayout()
-        search_label = QLabel("🔍 搜索:")
+        search_label = QLabel("关键词:")
         search_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
         search_layout.addWidget(search_label)
 
@@ -1061,7 +1064,7 @@ class LogSearchDialog(QDialog):
         self.search_edit.setMinimumHeight(32)
         search_layout.addWidget(self.search_edit, 1)
 
-        self.search_btn = QPushButton("搜索")
+        self.search_btn = QPushButton("🔍 搜索")
         self.search_btn.setMinimumWidth(80)
         self.search_btn.clicked.connect(self.on_search)
         search_layout.addWidget(self.search_btn)

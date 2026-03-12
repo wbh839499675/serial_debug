@@ -2,7 +2,7 @@
 数据接收处理模块
 """
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtGui import QTextCursor
 from utils.logger import Logger
@@ -25,6 +25,11 @@ class DataReceiver(QObject):
         self.recv_rate = 0.0
         self.pause_recv = False  # 添加暂停接收标志
         self.receive_buffer = ""  # 添加接收缓冲区
+        self._last_data = b''  # 初始化最后接收的数据
+        self._rate_timeout = 1.0  # 速率超时时间（秒）
+        self._rate_timer = QTimer(self)  # 速率检测定时器
+        self._rate_timer.timeout.connect(self._check_rate_timeout)
+        self._rate_timer.start(50)  # 每50ms检查一次
 
     def set_recv_text(self, text_edit: QTextEdit) -> None:
         """设置接收文本框"""
@@ -61,6 +66,7 @@ class DataReceiver(QObject):
 
         # 更新统计
         self.total_recv_bytes += len(data)
+        self._last_data = data  # 保存当前数据用于计算速率
         self._update_recv_rate()
 
         # 将数据解码并添加到缓冲区
@@ -144,6 +150,7 @@ class DataReceiver(QObject):
         self.total_recv_bytes = 0
         self.recv_rate = 0.0
         self.last_recv_time = None
+        self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)
 
     def _stop_read_thread(self) -> None:
         """停止数据读取线程"""
@@ -166,3 +173,11 @@ class DataReceiver(QObject):
             Logger.log("数据读取线程已停止", "INFO")
         except Exception as e:
             Logger.log(f"停止数据读取线程失败: {str(e)}", "ERROR")
+
+    def _check_rate_timeout(self) -> None:
+        """检查速率是否超时"""
+        if self.last_recv_time:
+            delta = (datetime.now() - self.last_recv_time).total_seconds()
+            if delta > self._rate_timeout:
+                self.recv_rate = 0.0
+                self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)

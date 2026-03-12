@@ -10,7 +10,7 @@ class Version:
     PRODUCTION_VERSION = "1.0.0"
 
     # 试用版版本号
-    TRIAL_VERSION = "1.0.0-beta"
+    TRIAL_VERSION = "1.0.1-beta"
 
     # 当前版本类型
     IS_TRIAL = False  # True表示试用版，False表示正式版
