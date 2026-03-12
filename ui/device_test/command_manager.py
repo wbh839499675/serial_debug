@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 import json
@@ -13,8 +14,16 @@ class ATCommandManager:
         self.command_history = []
         self.common_commands = self._load_common_commands()
 
+        # 获取资源文件路径（兼容开发环境和打包环境）
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            base_path = Path(sys._MEIPASS)
+        else:
+            # 开发环境
+            base_path = Path(__file__).parent.parent.parent
+
         # 命令集管理功能
-        self.config_file = Path("script/model_commands.json")
+        self.config_file = base_path / "script" / "model_commands.json"
         self.model_command_sets = self._load_command_sets()
 
     def _load_common_commands(self):

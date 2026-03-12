@@ -1122,7 +1122,13 @@ class LogSearchDialog(QDialog):
                 font-weight: bold;
             }
         """)
+        self.match_content_table.itemDoubleClicked.connect(self._on_table_double_clicked)
         layout.addWidget(self.match_content_table)
+
+        # 添加结果标签
+        self.result_label = QLabel("未搜索")
+        self.result_label.setStyleSheet("color: #606266; font-size: 10pt; font-weight: bold;")
+        layout.addWidget(self.result_label)
 
         # 导航按钮
         nav_layout = QHBoxLayout()
@@ -1180,6 +1186,10 @@ class LogSearchDialog(QDialog):
         text = self.search_edit.text()
         if not text:
             return
+
+        # 清空上一次的搜索结果
+        self.match_content_table.setRowCount(0)
+        self.result_label.setText("搜索中...")
 
         case_sensitive = self.case_sensitive_check.isChecked()
         use_regex = self.use_regex_check.isChecked()
@@ -1272,6 +1282,9 @@ class LogSearchDialog(QDialog):
             content_label.setTextFormat(Qt.RichText)  # 设置为富文本格式
             content_label.setWordWrap(True)  # 启用自动换行
 
+            # 添加双击事件处理
+            content_label.mouseDoubleClickEvent = lambda event, r=row: self._on_label_double_clicked(r)
+
             # 如果是当前匹配项，设置不同的背景色
             #if i == self.current_match_index:
             #    content_label.setStyleSheet("background-color: #FFA500; color: white; padding: 5px;")
@@ -1283,3 +1296,48 @@ class LogSearchDialog(QDialog):
         self.match_content_table.selectRow(self.current_match_index)
         self.match_content_table.scrollToItem(self.match_content_table.item(self.current_match_index, 0))
 
+    def _on_table_double_clicked(self, item):
+        """处理表格双击事件"""
+        if not item:
+            Logger.log("双击事件：item为空", "WARNING")
+            return
+
+        # 获取点击的行号
+        row = item.row()
+        Logger.log(f"双击行号: {row}", "DEBUG")
+
+        # 检查搜索结果是否存在
+        if not self.search_results:
+            Logger.log("双击事件：搜索结果为空", "WARNING")
+            QMessageBox.warning(self, "提示", "请先执行搜索操作")
+            return
+
+        # 检查索引是否有效
+        if row < 0 or row >= len(self.search_results):
+            Logger.log(f"双击事件：行号{row}超出范围(0-{len(self.search_results)-1})", "WARNING")
+            return
+
+        # 更新当前匹配索引
+        self.current_match_index = row
+
+        # 高亮当前匹配项
+        self._highlight_current_match()
+
+    def _on_label_double_clicked(self, row):
+        """处理内容标签双击事件"""
+        # 检查搜索结果是否存在
+        if not self.search_results:
+            Logger.log("双击事件：搜索结果为空", "WARNING")
+            QMessageBox.warning(self, "提示", "请先执行搜索操作")
+            return
+
+        # 检查索引是否有效
+        if row < 0 or row >= len(self.search_results):
+            Logger.log(f"双击事件：行号{row}超出范围(0-{len(self.search_results)-1})", "WARNING")
+            return
+
+        # 更新当前匹配索引
+        self.current_match_index = row
+
+        # 高亮当前匹配项
+        self._highlight_current_match()
