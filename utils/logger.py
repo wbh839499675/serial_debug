@@ -115,12 +115,12 @@ class Logger(QObject):
             log_file = open(log_file_path, 'wb')
 
             # 写入文件头
-            header = f"串口: {port_name}\n".encode('utf-8')
-            header += f"波特率: {config.get('baudrate', 115200)}\n".encode('utf-8')
-            header += f"数据位: {config.get('databits', 8)}\n".encode('utf-8')
-            header += f"停止位: {config.get('stopbits', 1)}\n".encode('utf-8')
-            header += f"校验位: {config.get('parity', 'N')}\n".encode('utf-8')
-            header += f"记录时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n".encode('utf-8')
+            header = f"串口: {port_name}\r\n".encode('utf-8')
+            header += f"波特率: {config.get('baudrate', 115200)}\r\n".encode('utf-8')
+            header += f"数据位: {config.get('databits', 8)}\r\n".encode('utf-8')
+            header += f"停止位: {config.get('stopbits', 1)}\r\n".encode('utf-8')
+            header += f"校验位: {config.get('parity', 'N')}\r\n".encode('utf-8')
+            header += f"记录时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\r\n".encode('utf-8')
             header += ("="*80 + "\r\n").encode('utf-8')
             log_file.write(header)
             log_file.flush()
@@ -151,8 +151,8 @@ class Logger(QObject):
             try:
                 log_file = Logger.serial_log_files[port_name]
                 # 写入文件尾 - 使用bytes
-                footer = ("\n\n日志关闭时间: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n").encode('utf-8')
-                footer += ("="*80 + "\r\n").encode('utf-8')
+                footer = ("\r\n日志关闭时间: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\r\n").encode('utf-8')
+                footer += ("="*80).encode('utf-8')
                 log_file.write(footer)
                 log_file.close()
 
