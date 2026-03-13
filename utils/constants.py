@@ -992,7 +992,7 @@ def get_button_style(style_type: str = 'primary', size: str = 'normal',
         width_style = f"min-width: {btn_width}px;"
     else:
         width_style = f"min-width: {btn_width}px; max-width: {btn_width}px;"
-    
+
     if expand_height:
         height_style = f"min-height: {btn_height}px;"
     else:

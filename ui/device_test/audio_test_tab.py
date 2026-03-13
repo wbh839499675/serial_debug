@@ -199,8 +199,9 @@ class AudioTestTab(QWidget):
             ("📁文件管理", "file_management"),
             ("🎙️录音", "recording"),
             ("🔊播放", "playback"),
-            ("🗣️TTS测试", "tts_test"),
-            ("📞通话测试", "call_test"),
+            ("🗣️TTS", "tts_test"),
+            ("🔢DTMF", "dtmf_test"),
+            ("📞通话", "call_test"),
             #("🤖自动测试", "auto_test")
         ]
 
@@ -275,6 +276,9 @@ class AudioTestTab(QWidget):
 
         self.tts_test_panel = self.create_tts_test_panel()
         self.stacked_widget.addWidget(self.tts_test_panel)
+
+        self.dtmf_test_panel = self.create_dtmf_test_panel()
+        self.stacked_widget.addWidget(self.dtmf_test_panel)
 
         self.call_test_panel = self.create_call_test_panel()
         self.stacked_widget.addWidget(self.call_test_panel)
@@ -1217,6 +1221,105 @@ class AudioTestTab(QWidget):
 
         return card
 
+    def create_dtmf_test_panel(self):
+        """创建DTMF测试面板"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
+
+        # DTMF设置卡片
+        dtmf_settings_card = self.create_dtmf_settings_card()
+        layout.addWidget(dtmf_settings_card)
+
+        # DTMF键盘卡片
+        dtmf_keypad_card = self.create_dtmf_keypad_card()
+        layout.addWidget(dtmf_keypad_card)
+
+        layout.addStretch()
+        return panel
+
+    def create_dtmf_settings_card(self):
+        """创建DTMF设置卡片"""
+        card = QGroupBox("DTMF设置")
+        card.setStyleSheet(get_group_style('primary'))
+        card_layout = QHBoxLayout(card)
+
+        # 发音时间长度选择
+        card_layout.addWidget(QLabel("发音时间长度(100ms):"))
+        self.dtmf_duration_combo = QComboBox()
+        self.dtmf_duration_combo.addItems(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+        self.dtmf_duration_combo.setCurrentIndex(1)  # 默认选择100ms
+        self.dtmf_duration_combo.setStyleSheet(get_combobox_style('primary', 'small'))
+        card_layout.addWidget(self.dtmf_duration_combo)
+
+        card_layout.addStretch()
+
+        return card
+
+    def create_dtmf_keypad_card(self):
+        """创建DTMF键盘卡片"""
+        card = QGroupBox("DTMF键盘")
+        card.setStyleSheet(get_group_style('primary'))
+        card_layout = QGridLayout(card)
+
+        # 定义DTMF键盘布局（5x4布局，支持完整DTMF字符集）
+        keypad_layout = [
+            ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+            ["A", "B", "C", "D", "E", "F", "G", "", "", "",],
+            ["a", "b", "c", "d", "e", "f", "g", "", "", "",],
+            ["*", "#"],
+
+        ]
+
+        # 创建DTMF键盘按钮
+        self.dtmf_buttons = {}
+        for i, row in enumerate(keypad_layout):
+            for j, key in enumerate(row):
+                if key:  # 跳过空字符串
+                    btn = QPushButton(key)
+                    btn.setFixedSize(50, 50)
+                    # 根据按键类型设置不同样式
+                    if key.isdigit():
+                        btn.setStyleSheet(get_button_style('primary'))
+                    elif key in ['*', '#']:
+                        btn.setStyleSheet(get_button_style('warning'))
+                    elif key.isupper():
+                        btn.setStyleSheet(get_button_style('success'))
+                    else:  # 小写字母
+                        btn.setStyleSheet(get_button_style('info'))
+                    btn.clicked.connect(lambda checked, k=key: self.send_dtmf(k))
+                    self.dtmf_buttons[key] = btn
+                    card_layout.addWidget(btn, i, j)
+
+        return card
+
+
+    def send_dtmf(self, key):
+        """发送DTMF命令"""
+        if not self.serial_controller or not self.serial_controller.is_connected:
+            self.log_signal.emit("串口未连接，无法发送DTMF", "ERROR")
+            return
+
+        try:
+            # 获取发音时间长度
+            duration = self.dtmf_duration_combo.currentText()
+
+            # 发送DTMF命令
+            command = f'AT+CDTMF={key},{duration}\r\n'
+            response = self.serial_controller.write_and_read(command, 1.0)
+            self.log_signal.emit(f"TX: {command}", "TX")
+            self.log_signal.emit(f"RX: {response}", "RX")
+
+            # 检查响应
+            if "OK" in response:
+                actual_duration = int(duration) * 100
+                self.log_signal.emit(f"DTMF {key} 发送成功，时长: {actual_duration}ms", "INFO")
+            else:
+                self.log_signal.emit(f"DTMF {key} 发送失败: {response}", "ERROR")
+        except Exception as e:
+            self.log_signal.emit(f"发送DTMF失败: {str(e)}", "ERROR")
+
     def create_call_test_panel(self):
         """创建通话测试面板"""
         panel = QWidget()
@@ -1699,7 +1802,8 @@ class AudioTestTab(QWidget):
             'recording': 2,
             'playback': 3,
             'tts_test': 4,
-            'call_test': 5,
+            'dtmf_test': 5,
+            'call_test': 6,
             #'auto_test': 7
         }
 
@@ -2204,18 +2308,21 @@ class AudioTestTab(QWidget):
                 self.log_signal.emit("请选择要播放的文件", "WARNING")
                 return
 
+            # 清空缓冲区
+            self.serial_controller.clear_buffers()
+
             # 发送播放命令
             #AUDPLAY: (1-4),<file_name>
-            self.serial_controller.write(f'AT+QAUDPLAY="{filename}"')
+            self.serial_controller.write(f'AT+CAUDPLAY=1,"{filename}"\r\n')
             response = self.serial_controller.read_response()
-            self.log_signal.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
+            self.log_signal.emit(f'TX: AT+CAUDPLAY=1,"{filename}"', "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
             # 更新UI
             self.is_playing = True
             self.playback_status_label.setText("状态: 播放中")
             self.playback_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #67c23a;")
-            self.play_btn.setEnabled(False)
+            #self.play_btn.setEnabled(False)
             self.pause_btn.setEnabled(True)
             self.resume_btn.setEnabled(False)
             self.stop_playback_btn.setEnabled(True)
@@ -2224,7 +2331,7 @@ class AudioTestTab(QWidget):
 
             # 启动播放定时器
             self.playback_time = 0
-            self.playing_timer.start(1000)
+            self.playing_timer.start(100)
 
             self.log_signal.emit(f"开始播放音频: {filename}", "INFO")
         except Exception as e:
@@ -2237,10 +2344,13 @@ class AudioTestTab(QWidget):
             return
 
         try:
+            # 清空缓冲区
+            self.serial_controller.clear_buffers()
+
             # 发送暂停播放命令
-            self.serial_controller.write("AT+QAUDPLAY=0")
+            self.serial_controller.write("AT+CAUDPLAY=2\r\n")
             response = self.serial_controller.read_response()
-            self.log_signal.emit("TX: AT+QAUDPLAY=0", "TX")
+            self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
             # 更新UI
@@ -2252,27 +2362,30 @@ class AudioTestTab(QWidget):
             self.stop_playback_btn.setEnabled(True)
             self.audio_status_label.setText("当前状态: 已暂停")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #e6a23c;")
-            
+
             # 停止播放定时器
             self.playing_timer.stop()
-            
+
             self.log_signal.emit("播放已暂停", "INFO")
         except Exception as e:
             self.log_signal.emit(f"暂停播放失败: {str(e)}", "ERROR")
-    
+
     def resume_audio(self):
         """恢复播放"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法恢复播放", "ERROR")
             return
-        
+
         try:
+            # 清空缓冲区
+            self.serial_controller.clear_buffers()
+
             # 发送恢复播放命令
-            self.serial_controller.write("AT+QAUDPLAY=1")
+            self.serial_controller.write("AT+CAUDPLAY=3\r\n")
             response = self.serial_controller.read_response()
-            self.log_signal.emit("TX: AT+QAUDPLAY=1", "TX")
+            self.log_signal.emit("TX: AT+CAUDPLAY=3", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             # 更新UI
             self.playback_status_label.setText("状态: 播放中")
             self.playback_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #67c23a;")
@@ -2282,27 +2395,30 @@ class AudioTestTab(QWidget):
             self.stop_playback_btn.setEnabled(True)
             self.audio_status_label.setText("当前状态: 播放中")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
-            
+
             # 启动播放定时器
             self.playing_timer.start(1000)
-            
+
             self.log_signal.emit("播放已恢复", "INFO")
         except Exception as e:
             self.log_signal.emit(f"恢复播放失败: {str(e)}", "ERROR")
-    
+
     def stop_audio(self):
         """停止播放"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法停止播放", "ERROR")
             return
-        
+
         try:
+            # 清空缓冲区
+            self.serial_controller.clear_buffers()
+
             # 发送停止播放命令
-            self.serial_controller.write("AT+QAUDPLAY=2")
+            self.serial_controller.write("AT+CAUDPLAY=0")
             response = self.serial_controller.read_response()
-            self.log_signal.emit("TX: AT+QAUDPLAY=2", "TX")
+            self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             # 更新UI
             self.is_playing = False
             self.playback_status_label.setText("状态: 空闲")
@@ -2313,10 +2429,10 @@ class AudioTestTab(QWidget):
             self.stop_playback_btn.setEnabled(False)
             self.audio_status_label.setText("当前状态: 空闲")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-            
+
             # 停止播放定时器
             self.playing_timer.stop()
-            
+
             self.log_signal.emit("播放已停止", "INFO")
         except Exception as e:
             self.log_signal.emit(f"停止播放失败: {str(e)}", "ERROR")
@@ -2420,7 +2536,7 @@ class AudioTestTab(QWidget):
             if "OK" in response:
                 self.log_signal.emit(f"文件上传完成: {filename}", "INFO")
                 # 刷新文件列表
-                #self.refresh_audio_files()
+                self.refresh_audio_files()
             else:
                 self.log_signal.emit(f"文件上传失败: {response}", "ERROR")
 
@@ -2532,7 +2648,6 @@ class AudioTestTab(QWidget):
         except Exception as e:
             self.log_signal.emit(f"下载文件失败: {str(e)}", "ERROR")
 
-
     def delete_file(self):
         """删除文件"""
         if not self.serial_controller or not self.serial_controller.is_connected:
@@ -2550,8 +2665,8 @@ class AudioTestTab(QWidget):
             filename = self.file_list_table.item(row, 0).text()
 
             # 先清空缓冲区
-            #self.serial_controller.clear_buffers()
-            #time.sleep(0.1)
+            self.serial_controller.clear_buffers()
+            time.sleep(0.1)
 
             # 发送删除文件命令
             response = self.serial_controller.write_and_read(f'AT+QFDEL=\"{filename}\"\r\n', 3.0)
@@ -2561,7 +2676,7 @@ class AudioTestTab(QWidget):
             self.log_signal.emit(f"文件已删除: {filename}", "INFO")
 
             # 刷新文件列表
-            #self.refresh_audio_files()
+            self.refresh_audio_files()
         except Exception as e:
             self.log_signal.emit(f"删除文件失败: {str(e)}", "ERROR")
 
@@ -2572,6 +2687,9 @@ class AudioTestTab(QWidget):
             return
 
         try:
+            self.log_signal.emit("功能未开发", "ERROR")
+            return
+
             # 获取选中的文件
             selected_rows = self.file_list_table.selectionModel().selectedRows()
             if not selected_rows:
@@ -2802,7 +2920,6 @@ class AudioTestTab(QWidget):
         if not enabled and self.stacked_widget.currentIndex() == 5:
             self.switch_panel('device_config')
 
-
     def dial_call(self):
         """拨打电话"""
         if not self.serial_controller or not self.serial_controller.is_connected:
@@ -2817,38 +2934,88 @@ class AudioTestTab(QWidget):
                 return
 
             # 发送拨号命令
-            self.serial_controller.write(f"ATD{phone_number};")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read(f"ATD{phone_number}\r\n", 0.3)
             self.log_signal.emit(f"TX: ATD{phone_number};", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
-            # 更新UI
-            self.dial_btn.setEnabled(False)
-            self.hangup_btn.setEnabled(True)
-            self.call_status_label.setText("状态: 呼叫中")
-            self.call_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #e6a23c;")
-            self.call_record_btn.setEnabled(False)
-            self.call_play_btn.setEnabled(False)
-            self.audio_status_label.setText("当前状态: 呼叫中")
-            self.audio_status_label.setStyleSheet("font-size: 10pt; color: #e6a23c;")
-            
-            self.log_signal.emit(f"正在拨打电话: {phone_number}", "INFO")
+            # 检查初始响应
+            if "ERROR" in response:
+                self.log_signal.emit(f"拨号失败: {response}", "ERROR")
+                self.update_call_ui_to_idle()
+                return
+
+            # 等待一段时间，检查是否有+CIEV: "CALL",0（呼叫失败）或+CIEV: "CALL",1（呼叫成功）
+            time.sleep(0.5)
+
+            # 清空缓冲区并读取后续响应
+            self.serial_controller.clear_buffers()
+            time.sleep(0.1)
+
+            # 读取可能的后续响应
+            follow_up_response = self.serial_controller.read_response()
+            if follow_up_response:
+                self.log_signal.emit(f"RX: {follow_up_response}", "RX")
+
+                # 检查呼叫状态
+                if '+CIEV: "CALL",0' in follow_up_response or "ERROR" in follow_up_response:
+                    self.log_signal.emit(f"拨号失败: {follow_up_response}", "ERROR")
+                    self.update_call_ui_to_idle()
+                    return
+                elif '+CIEV: "CALL",1' in follow_up_response:
+                    # 呼叫成功
+                    self.log_signal.emit(f"正在拨打电话: {phone_number}", "INFO")
+                    self.update_call_ui_to_dialing()
+                else:
+                    # 未知响应，保持当前状态
+                    self.log_signal.emit(f"收到未知响应: {follow_up_response}", "WARNING")
+            else:
+                # 没有收到后续响应，假设拨号成功
+                self.log_signal.emit(f"正在拨打电话: {phone_number}", "INFO")
+                self.update_call_ui_to_dialing()
+
         except Exception as e:
             self.log_signal.emit(f"拨打电话失败: {str(e)}", "ERROR")
-    
+            self.update_call_ui_to_idle()
+
+    def update_call_ui_to_idle(self):
+        """更新通话UI到空闲状态"""
+        self.dial_btn.setEnabled(True)
+        self.hangup_btn.setEnabled(False)
+        self.answer_btn.setEnabled(False)
+        self.reject_btn.setEnabled(False)
+        self.call_status_label.setText("状态: 空闲")
+        self.call_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #909399;")
+        self.call_duration_label.setText("通话时长: 0秒")
+        self.call_record_btn.setEnabled(False)
+        self.call_play_btn.setEnabled(False)
+        self.audio_status_label.setText("当前状态: 空闲")
+        self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
+
+    def update_call_ui_to_dialing(self):
+        """更新通话UI到呼叫中状态"""
+        self.dial_btn.setEnabled(False)
+        self.hangup_btn.setEnabled(True)
+        self.answer_btn.setEnabled(False)
+        self.reject_btn.setEnabled(False)
+        self.call_status_label.setText("状态: 呼叫中")
+        self.call_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #e6a23c;")
+        self.call_record_btn.setEnabled(False)
+        self.call_play_btn.setEnabled(False)
+        self.audio_status_label.setText("当前状态: 呼叫中")
+        self.audio_status_label.setStyleSheet("font-size: 10pt; color: #e6a23c;")
+
     def hangup_call(self):
         """挂断电话"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法挂断电话", "ERROR")
             return
-        
+
         try:
             # 发送挂断命令
-            self.serial_controller.write("ATH")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read("ATH\r\n", 0.3)
             self.log_signal.emit("TX: ATH", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             # 更新UI
             self.dial_btn.setEnabled(True)
             self.hangup_btn.setEnabled(False)
@@ -2861,27 +3028,26 @@ class AudioTestTab(QWidget):
             self.call_play_btn.setEnabled(False)
             self.audio_status_label.setText("当前状态: 空闲")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-            
+
             # 停止通话定时器
             self.call_timer.stop()
-            
+
             self.log_signal.emit("电话已挂断", "INFO")
         except Exception as e:
             self.log_signal.emit(f"挂断电话失败: {str(e)}", "ERROR")
-    
+
     def answer_call(self):
         """接听电话"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法接听电话", "ERROR")
             return
-        
+
         try:
             # 发送接听命令
-            self.serial_controller.write("ATA")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read("ATA\r\n", 0.3)
             self.log_signal.emit("TX: ATA", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             # 更新UI
             self.answer_btn.setEnabled(False)
             self.reject_btn.setEnabled(False)
@@ -2891,28 +3057,27 @@ class AudioTestTab(QWidget):
             self.call_play_btn.setEnabled(True)
             self.audio_status_label.setText("当前状态: 通话中")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
-            
+
             # 启动通话定时器
             self.call_time = 0
             self.call_timer.start(1000)
-            
+
             self.log_signal.emit("电话已接听", "INFO")
         except Exception as e:
             self.log_signal.emit(f"接听电话失败: {str(e)}", "ERROR")
-    
+
     def reject_call(self):
         """拒接电话"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法拒接电话", "ERROR")
             return
-        
+
         try:
             # 发送挂断命令
-            self.serial_controller.write("ATH")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read("ATH\r\n", 0.3)
             self.log_signal.emit("TX: ATH", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             # 更新UI
             self.answer_btn.setEnabled(False)
             self.reject_btn.setEnabled(False)
@@ -2920,52 +3085,52 @@ class AudioTestTab(QWidget):
             self.call_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #909399;")
             self.audio_status_label.setText("当前状态: 空闲")
             self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
-            
+
             self.log_signal.emit("电话已拒接", "INFO")
         except Exception as e:
             self.log_signal.emit(f"拒接电话失败: {str(e)}", "ERROR")
-    
+
     def update_call_status(self):
         """更新通话状态"""
         self.call_time += 1
         self.call_duration_label.setText(f"通话时长: {self.call_time}秒")
-    
+
     def record_during_call(self):
         """通话中录音"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法通话中录音", "ERROR")
             return
-        
+
         try:
             # 发送通话中录音命令
             self.serial_controller.write('AT+QAUDREC="C:\\call_rec.amr",60')
             response = self.serial_controller.read_response()
             self.log_signal.emit('TX: AT+QAUDREC="C:\\call_rec.amr",60', "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             self.log_signal.emit("开始通话中录音", "INFO")
         except Exception as e:
             self.log_signal.emit(f"通话中录音失败: {str(e)}", "ERROR")
-    
+
     def play_during_call(self):
         """通话中播放"""
         if not self.serial_controller or not self.serial_controller.is_connected:
             self.log_signal.emit("串口未连接，无法通话中播放", "ERROR")
             return
-        
+
         try:
             # 获取选中的文件
             filename = self.playback_file_combo.currentText()
             if not filename:
                 self.log_signal.emit("请选择要播放的文件", "WARNING")
                 return
-            
+
             # 发送通话中播放命令
             self.serial_controller.write(f'AT+QAUDPLAY="{filename}"')
             response = self.serial_controller.read_response()
             self.log_signal.emit(f'TX: AT+QAUDPLAY="{filename}"', "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
-            
+
             self.log_signal.emit(f"开始通话中播放: {filename}", "INFO")
         except Exception as e:
             self.log_signal.emit(f"通话中播放失败: {str(e)}", "ERROR")
