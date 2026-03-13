@@ -1,4 +1,83 @@
 {
+    "SLM310-G": {
+    "hardware": {
+      "gpio_pins": 16,
+      "adc_channels": 4,
+      "pwm_channels": 0,
+      "i2c_support": true,
+      "spi_support": true,
+      "uart_channels": 3,
+      "gnss_support": true
+    },
+    "audio_support": {
+      "channels": "扬声器",
+      "formats": "PCM、MP3、WAV、AMR、AMR-WB",
+      "sample_rates": "8kHz、16kHz",
+      "microphones": "内置麦克风"
+    },
+    "info": {
+      "name": "SLM310-G",
+      "description": "LTE Cat.1 模组",
+      "manufacturer": "UIS8910DM",
+      "datasheet": "docs/SLM310-G/SLM310-G_Datasheet.pdf",
+      "schematic": "docs/SLM310-G/SLM310-G_Schematic.pdf",
+      "pinout": "docs/SLM310-G_Pinout.png"
+    },
+    "resources": {
+      "pinout": {
+        "title": "引脚分布",
+        "image": "docs/SLM310-G/SLM310-G_Pinout.png",
+        "description": "模块引脚分布图"
+      },
+      "schematic": {
+        "title": "原理图",
+        "image": "docs/SLM310-G/SLM310-G_Schematic.png",
+        "description": "模块原理图"
+      },
+      "manual": {
+        "title": "硬件设计手册",
+        "file": "docs/SLM310-G/SLM310-G_Manual.pdf",
+        "description": "硬件设计手册"
+      }
+    }
+  },
+
+    "SLM332L": {
+    "hardware": {
+      "gpio_pins": 16,
+      "adc_channels": 4,
+      "pwm_channels": 2,
+      "i2c_support": true,
+      "spi_support": true,
+      "uart_channels": 3,
+      "gnss_support": true
+    },
+    "info": {
+      "name": "SLM332L",
+      "description": "LTE Cat.1 模组",
+      "manufacturer": "ASR1605",
+      "datasheet": "docs/SLM332L/SLM332L_Datasheet.pdf",
+      "schematic": "docs/SLM332L/SLM332L_Schematic.pdf",
+      "pinout": "docs/SLM332L_Pinout.png"
+    },
+    "resources": {
+      "pinout": {
+        "title": "引脚分布",
+        "image": "docs/SLM332L/SLM332L_Pinout.png",
+        "description": "模块引脚分布图"
+      },
+      "schematic": {
+        "title": "原理图",
+        "image": "docs/SLM332L/SLM332L_Schematic.png",
+        "description": "模块原理图"
+      },
+      "manual": {
+        "title": "硬件设计手册",
+        "file": "docs/SLM332L/SLM332L_Manual.pdf",
+        "description": "硬件设计手册"
+      }
+    }
+  },
   "SLM331Y": {
     "hardware": {
       "gpio_pins": 16,

@@ -159,18 +159,72 @@ class SerialController(QObject):
             for port in ports
         ]
 
-    def read_response(self, port_name, timeout=1.0):
-        """读取串口响应"""
+    def read_response(self, port_name=None, timeout=1.0):
+        """读取串口响应，支持多行数据
+
+        Args:
+            port_name: 串口名称（保留参数，暂未使用）
+            timeout: 超时时间（秒）
+
+        Returns:
+            str: 读取到的完整响应数据，超时返回None
+        """
         if not self.serial_port or not self.serial_port.is_open:
             return None
 
-        # 设置读取超时
-        self.serial_port.timeout = timeout
-
         try:
-            # 读取响应数据
-            response = self.serial_port.read_all().decode('utf-8', errors='ignore')
-            return response.strip()
+            response = ""
+            start_time = time.time()
+            last_data_time = start_time
+
+            # 循环读取直到超时
+            while (time.time() - start_time) < timeout:
+                if self.serial_port.in_waiting > 0:
+                    # 读取可用数据
+                    data = self.serial_port.read(self.serial_port.in_waiting)
+                    if data:
+                        response += data.decode('utf-8', errors='ignore')
+                        last_data_time = time.time()
+
+                        # 检查是否收到完整帧（以\r\n结尾）
+                        if response.endswith('\r\n'):
+                            # 检查是否包含OK或ERROR（表示响应结束）
+                            if 'OK' in response or 'ERROR' or '+CME ERROR'in response:
+                                return response.strip()
+
+                # 检查数据接收间隔是否超过100ms
+                if (time.time() - last_data_time) > 0.1:
+                    # 超过100ms没有新数据，认为数据接收完成
+                    if response:
+                        return response.strip()
+
+                time.sleep(0.01)  # 短暂休眠，避免CPU占用过高
+
+            # 超时返回None
+            return None
+
         except Exception as e:
             Logger.error(f"读取串口响应失败: {str(e)}", module='serial_controller')
+            return None
+
+
+    def write_and_read(self, command: str, timeout: float = 1.0) -> str:
+        """发送AT命令并读取响应
+
+        Args:
+            command: AT命令字符串
+            timeout: 读取超时时间(秒)
+
+        Returns:
+            str: 串口响应内容，失败返回None
+        """
+        try:
+            # 发送命令
+            self.write(command)
+
+            # 读取响应
+            response = self.read_response(timeout=timeout)
+            return response
+        except Exception as e:
+            Logger.error(f"发送命令并读取响应失败: {str(e)}", module='serial_controller')
             return None
