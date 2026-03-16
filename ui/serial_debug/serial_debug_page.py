@@ -749,9 +749,11 @@ class SerialDebugTab(QWidget):
                 if send_btn:
                     send_btn.setEnabled(True)
 
+        # 设置数据接收器的波特率
+        self.data_receiver.set_baudrate(self.baudrate)
+
         # 启动数据读取线程
         self._start_read_thread()
-
 
     def _start_read_thread(self):
         """启动数据读取线程"""

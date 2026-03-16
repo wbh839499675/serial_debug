@@ -31,6 +31,35 @@ class DataReceiver(QObject):
         self._rate_timer.timeout.connect(self._check_rate_timeout)
         self._rate_timer.start(50)  # 每50ms检查一次
 
+        # 添加波特率属性
+        self.baudrate = 115200  # 默认波特率
+
+        # 动态计算空闲超时时间
+        self._update_idle_timeout()
+
+        # 添加空闲检测相关属性
+        self._idle_timer = QTimer(self)  # 空闲检测定时器
+        self._idle_timer.setSingleShot(True)  # 单次触发
+        self._idle_timer.timeout.connect(self._on_idle_timeout)  # 超时处理
+
+    def _update_idle_timeout(self):
+        """根据波特率更新空闲超时时间"""
+        # 计算每字节传输时间（毫秒）
+        byte_time_ms = 1000 * 10 / self.baudrate  # 10位/字节（1起始位+8数据位+1停止位）
+
+        # 设置空闲超时时间为传输3-5个字节的时间
+        self._idle_timeout = int(byte_time_ms * 5)
+
+        # 确保超时时间在合理范围内（最小10ms，最大200ms）
+        self._idle_timeout = max(10, min(self._idle_timeout, 200))
+
+        Logger.log(f"波特率: {self.baudrate}, 空闲超时时间: {self._idle_timeout}ms", "DEBUG")
+
+    def set_baudrate(self, baudrate: int):
+        """设置波特率并更新空闲超时时间"""
+        self.baudrate = baudrate
+        self._update_idle_timeout()
+
     def set_recv_text(self, text_edit: QTextEdit) -> None:
         """设置接收文本框"""
         self.recv_text = text_edit
@@ -77,31 +106,43 @@ class DataReceiver(QObject):
             Logger.log(f"数据解码失败: {str(e)}", "ERROR")
             return
 
-        # 处理完整的行 - 保留空行
+        # 重置空闲定时器，每次接收到数据都重新计时
+        self._idle_timer.stop()
+        self._idle_timer.start(self._idle_timeout)
+
+    def _format_data(self, data: bytes) -> str:
+            """格式化数据"""
+            if self.hex_display:
+                return data.hex(' ').upper()
+            return data.decode('utf-8', errors='ignore')
+
+    def _on_idle_timeout(self) -> None:
+        """空闲超时处理，表示接收到了完整的数据帧"""
+        if not self.receive_buffer:
+            return
+
+        # 处理缓冲区中的所有数据
         lines = self.receive_buffer.split('\n')
-        for line in lines[:-1]:
-            # 格式化数据
-            display_data = self._format_data(line.encode('utf-8'))
-            self._display_data(display_data)
+
+        # 处理每一行数据
+        for line in lines:
+            if line.strip():  # 只处理非空行
+                # 格式化数据
+                display_data = self._format_data(line.encode('utf-8'))
+                self._display_data(display_data)
 
         # 在帧尾添加空行
-        if lines[:-1] and self.recv_text:
+        if self.recv_text and lines:
             self.recv_text.append('')
 
-        # 保存不完整的行
-        self.receive_buffer = lines[-1]
+        # 清空缓冲区
+        self.receive_buffer = ""
 
-        # 发送信号 - 一次性发送所有数据
-        complete_data = '\n'.join(lines[:-1])
+        # 发送信号
+        complete_data = '\n'.join(lines)
         if complete_data:
             self.data_received.emit(complete_data)
         self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)
-
-    def _format_data(self, data: bytes) -> str:
-        """格式化数据"""
-        if self.hex_display:
-            return data.hex(' ').upper()
-        return data.decode('utf-8', errors='ignore')
 
     def _display_data(self, data: str) -> None:
         """显示数据"""
