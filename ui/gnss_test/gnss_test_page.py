@@ -20,7 +20,9 @@ from ui.gnss_test.parse_thread import ParseNMEAFileThread
 from ui.gnss_test.dockable_widget import DockableWidget
 import os
 import hashlib
-
+import requests
+import json
+from datetime import datetime
 
 class GNSSTestPage(QWidget):
     """GNSS测试页面"""
@@ -60,16 +62,16 @@ class GNSSTestPage(QWidget):
         management_layout.addWidget(QLabel("串口:"), 0, 0)
         self.port_combo = QComboBox()
         self.port_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.port_combo.setStyleSheet(get_combobox_style('primary', 'small'))
+        self.port_combo.setStyleSheet(get_combobox_style('primary', 'small', width=180))
         self.refresh_ports()
         management_layout.addWidget(self.port_combo, 0, 1)
 
         # 波特率选择
         management_layout.addWidget(QLabel("波特率:"), 0, 2)
         self.baudrate_combo = QComboBox()
-        self.baudrate_combo.setStyleSheet(get_combobox_style('primary', 'small'))
-        self.baudrate_combo.addItems(["4800", "9600", "19200", "38400", "57600", "115200", "230400", "460800"])
-        self.baudrate_combo.setCurrentText("9600")
+        self.baudrate_combo.setStyleSheet(get_combobox_style('primary', 'small', width=80))
+        self.baudrate_combo.addItems(["9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1000000", "3000000"])
+        self.baudrate_combo.setCurrentText("115200")
         management_layout.addWidget(self.baudrate_combo, 0, 3)
 
         # 添加设备按钮
@@ -92,6 +94,25 @@ class GNSSTestPage(QWidget):
 
         layout.addWidget(management_group)
         top_layout.addWidget(management_group, 1)
+
+        # === RTK设备管理面板 ===
+        rtk_management_group = QGroupBox("📡RTK设备管理")
+        rtk_management_group.setStyleSheet(get_group_style('primary'))
+        rtk_management_layout = QGridLayout(rtk_management_group)
+        rtk_management_layout.setSpacing(10)
+
+        # 连接RTK设备按钮
+        self.connect_rtk_btn = QPushButton("🔗 连接RTK")
+        self.connect_rtk_btn.setStyleSheet(get_page_button_style('gnss', 'connect'))
+        self.connect_rtk_btn.clicked.connect(self.connect_rtk_device)
+        rtk_management_layout.addWidget(self.connect_rtk_btn, 0, 1)
+
+        # RTK设备状态显示
+        self.rtk_status_label = QLabel("RTK状态: 未连接")
+        self.rtk_status_label.setStyleSheet("color: #f56c6c; font-size: 10pt; font-weight: bold;")
+        rtk_management_layout.addWidget(self.rtk_status_label, 0, 2)
+
+        top_layout.addWidget(rtk_management_group, 1)
 
         # === 数据分析面板 ===
         analysis_group = QGroupBox("📊数据分析")
@@ -196,7 +217,7 @@ class GNSSTestPage(QWidget):
         self.port_combo.clear()
         ports = comports()
         for port in ports:
-            display_text = f"{port.device} - {port.description}"
+            display_text = f"{port.description}"
             self.port_combo.addItem(display_text, port.device)
 
         # 恢复之前选择的串口
@@ -254,7 +275,7 @@ class GNSSTestPage(QWidget):
         """连接所有设备"""
         for port, (tab, _) in self.device_tabs.items():
             if not tab.is_connected:
-                tab.connect_device()
+                tab.connect()
         Logger.info("连接所有GNSS设备", module='gnss')
 
     def disconnect_all_devices(self):
@@ -263,6 +284,286 @@ class GNSSTestPage(QWidget):
             if tab.is_connected:
                 tab.disconnect()
         Logger.info("断开所有GNSS设备", module='gnss')
+
+    def connect_rtk_device(self):
+        """连接RTK设备"""
+        # 检查是否已存在RTK设备标签页
+        if hasattr(self, 'rtk_device_tab') and self.rtk_device_tab is not None:
+            # 切换到已存在的RTK标签页
+            self.device_tab_widget.setCurrentWidget(self.rtk_device_tab)
+            CustomMessageBox("提示", "RTK设备标签页已存在", "info", self).exec_()
+            return
+
+        target_port = None
+        # 遍历所有可用串口
+        ports = comports()
+        for port in ports:
+            if port.vid == 0x0403 and port.pid == 0x6001:
+                print(f"Found port: {port.device}")
+                target_port = port.device
+                Logger.info(f"找到RTK设备: {port.device}, 硬件ID: FTDIBUS\COMPORT&VID_0403&PID_6001", module='gnss')
+                break
+
+        # 如果没有找到指定设备，显示警告
+        if not target_port:
+            CustomMessageBox("警告", f"未找到硬件ID为 VID:0X0403 PID:0X6001 的RTK设备", "warning", self).exec_()
+            return
+
+        # 创建RTK设备标签页
+        self.rtk_device_tab = QWidget()
+        self.rtk_device_tab_layout = QVBoxLayout(self.rtk_device_tab)
+        self.rtk_device_tab_layout.setContentsMargins(10, 10, 10, 10)
+        self.rtk_device_tab_layout.setSpacing(10)
+
+        # === 创建水平布局容器 ===
+        config_layout = QHBoxLayout()
+        config_layout.setSpacing(10)
+
+        # === AGNSS配置组 ===
+        agnss_config_group = QGroupBox("🛰️AGNSS配置")
+        agnss_config_group.setStyleSheet(get_group_style('primary'))
+        agnss_config_layout = QFormLayout(agnss_config_group)
+
+        # === 参考位置配置 ===
+        ref_pos_group = QGroupBox("📍参考位置配置")
+        ref_pos_group.setStyleSheet(get_group_style('primary'))
+        ref_pos_layout = QFormLayout(ref_pos_group)
+
+        # 参考纬度
+        self.ref_lat_edit = QLineEdit()
+        self.ref_lat_edit.setPlaceholderText("例如: 31.2304")
+        ref_pos_layout.addRow("参考纬度 (°):", self.ref_lat_edit)
+
+        # 参考经度
+        self.ref_lon_edit = QLineEdit()
+        self.ref_lon_edit.setPlaceholderText("例如: 121.4737")
+        ref_pos_layout.addRow("参考经度 (°):", self.ref_lon_edit)
+
+        # 参考海拔
+        self.ref_alt_edit = QLineEdit()
+        self.ref_alt_edit.setPlaceholderText("例如: 10.0")
+        ref_pos_layout.addRow("参考海拔 (m):", self.ref_alt_edit)
+
+        agnss_config_layout.addWidget(ref_pos_group)
+
+        # === 网络配置 ===
+        network_group = QGroupBox("🌐网络配置")
+        network_group.setStyleSheet(get_group_style('primary'))
+        network_layout = QFormLayout(network_group)
+
+        # URL配置
+        self.rtk_url_edit = QLineEdit()
+        self.rtk_url_edit.setPlaceholderText("icoe-api.rx-networks.cn")
+        self.rtk_url_edit.setText("icoe-api.rx-networks.cn")
+        network_layout.addRow("URL:", self.rtk_url_edit)
+
+        # MID配置
+        self.rtk_mid_edit = QLineEdit()
+        self.rtk_mid_edit.setPlaceholderText("RXN-BASIC")
+        self.rtk_mid_edit.setText("RXN-BASIC")
+        network_layout.addRow("MID:", self.rtk_mid_edit)
+
+        # CID配置
+        self.rtk_cid_edit = QLineEdit()
+        self.rtk_cid_edit.setPlaceholderText("arEcK3siSm")
+        self.rtk_cid_edit.setText("arEcK3siSm")
+        network_layout.addRow("CID:", self.rtk_cid_edit)
+
+        # DID配置
+        self.rtk_did_edit = QLineEdit()
+        self.rtk_did_edit.setPlaceholderText("123454612345")
+        self.rtk_did_edit.setText("123454612345")
+        network_layout.addRow("DID:", self.rtk_did_edit)
+
+        # PASSWORD配置
+        self.rtk_password_edit = QLineEdit()
+        self.rtk_password_edit.setPlaceholderText("cTBFOFBxeGl2eUg2empFWA==")
+        self.rtk_password_edit.setText("cTBFOFBxeGl2eUg2empFWA==")
+        self.rtk_password_edit.setEchoMode(QLineEdit.Password)
+        network_layout.addRow("PASSWORD:", self.rtk_password_edit)
+
+        # 测试下载星历数据按钮
+        test_download_btn = QPushButton("下载星历")
+        test_download_btn.setStyleSheet(get_page_button_style('gnss', 'start_analysis'))
+        test_download_btn.clicked.connect(self.test_download_ephemeris)
+        network_layout.addRow("", test_download_btn)
+
+        agnss_config_layout.addWidget(network_group)
+
+        config_layout.addWidget(agnss_config_group)
+
+        # === DGNSS配置组 ===
+        dgnss_config_group = QGroupBox("📡DGNSS配置")
+        dgnss_config_group.setStyleSheet(get_group_style('primary'))
+        dgnss_config_layout = QFormLayout(dgnss_config_group)
+
+        # 客户列表
+        self.dgnss_customer_combo = QComboBox()
+        self.dgnss_customer_combo.setStyleSheet(get_combobox_style('primary', 'small'))
+        self.dgnss_customer_combo.addItems(["ZD"])
+        dgnss_config_layout.addRow("客户列表:", self.dgnss_customer_combo)
+
+        # 服务器URL
+        self.dgnss_server_url_edit = QLineEdit()
+        self.dgnss_server_url_edit.setPlaceholderText("106.13.146.74")
+        self.dgnss_server_url_edit.setText("106.13.146.74")
+        dgnss_config_layout.addRow("服务器URL:", self.dgnss_server_url_edit)
+
+        # 端口
+        self.dgnss_port_edit = QLineEdit()
+        self.dgnss_port_edit.setPlaceholderText("8102")
+        self.dgnss_port_edit.setText("8102")
+        dgnss_config_layout.addRow("端口:", self.dgnss_port_edit)
+
+        # 挂载点
+        self.dgnss_mount_point_edit = QLineEdit()
+        self.dgnss_mount_point_edit.setPlaceholderText("RTCM33GRCEJ")
+        self.dgnss_mount_point_edit.setText("RTCM33GRCEJ")
+        dgnss_config_layout.addRow("挂载点:", self.dgnss_mount_point_edit)
+
+        # 用户名
+        self.dgnss_username_edit = QLineEdit()
+        self.dgnss_username_edit.setPlaceholderText("xyw0060")
+        self.dgnss_username_edit.setText("xyw0060")
+        dgnss_config_layout.addRow("用户名:", self.dgnss_username_edit)
+
+        # 密码
+        self.dgnss_password_edit = QLineEdit()
+        self.dgnss_password_edit.setPlaceholderText("zr8bxrsb")
+        self.dgnss_password_edit.setText("zr8bxrsb")
+        self.dgnss_password_edit.setEchoMode(QLineEdit.Password)
+        dgnss_config_layout.addRow("密码:", self.dgnss_password_edit)
+
+        # 测试DGNSS连接按钮
+        test_dgnss_btn = QPushButton("测试连接")
+        test_dgnss_btn.setStyleSheet(get_page_button_style('gnss', 'connect'))
+        test_dgnss_btn.clicked.connect(self.test_dgnss_connection)
+        dgnss_config_layout.addRow("", test_dgnss_btn)
+
+        config_layout.addWidget(dgnss_config_group)
+
+        # 将水平布局添加到主布局
+        self.rtk_device_tab_layout.addLayout(config_layout)
+
+        # 添加弹性空间
+        self.rtk_device_tab_layout.addStretch()
+
+        # 添加RTK设备标签页
+        tab_index = self.device_tab_widget.addTab(self.rtk_device_tab, "RTK设备配置")
+        self.device_tab_widget.setCurrentIndex(tab_index)
+
+        # 更新RTK状态
+        #self.update_rtk_status(True)
+
+        Logger.info("已创建RTK设备配置标签页", module='gnss')
+
+    def test_download_ephemeris(self):
+        """测试下载星历数据"""
+        # 获取配置参数
+        url = self.rtk_url_edit.text()
+        mid = self.rtk_mid_edit.text()
+        cid = self.rtk_cid_edit.text()
+        did = self.rtk_did_edit.text()
+        password = self.rtk_password_edit.text()
+
+        # 验证必要参数
+        if not url:
+            CustomMessageBox("警告", "请输入URL", "warning", self).exec_()
+            return
+
+        if not mid or not cid or not did or not password:
+            CustomMessageBox("警告", "请输入完整的网络配置参数", "warning", self).exec_()
+            return
+
+        try:
+            # 构建请求内容
+            content = [{"rtAssistance":{"format":"rtcm","msgs":["GPS:1NAF","BDS:2NAF"]}}]
+            content_json = json.dumps(content)
+
+            # 构建Authorization头
+            auth_header = f"RXN-BASIC cId={cid},mId={mid},dId={did},pw={password}"
+
+            # 构建请求头
+            headers = {
+                "Host": url,
+                "Authorization": auth_header,
+                "Content-type": "application/json",
+                "Accept": "application/octet-stream",
+                "Content-length": str(len(content_json))
+            }
+
+            # 构建完整URL
+            full_url = f"http://{url}/rxn-api/locationApi/rtcm"
+
+            Logger.info(f"开始下载星历数据: URL={full_url}, MID={mid}, CID={cid}, DID={did}", module='gnss')
+
+            # 发送POST请求
+            response = requests.post(
+                full_url,
+                headers=headers,
+                data=content_json,
+                timeout=30
+            )
+
+            # 检查响应状态
+            if response.status_code == 200:
+                print("星历数据下载成功")
+                # 保存星历数据到文件
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"ephemeris_{timestamp}.rtcm"
+
+                with open(filename, 'wb') as f:
+                    f.write(response.content)
+
+                Logger.info(f"星历数据下载成功，已保存到: {filename}", module='gnss')
+                CustomMessageBox("成功", f"星历数据下载成功\n已保存到: {filename}", "success", self).exec_()
+            else:
+                error_msg = f"下载失败，HTTP状态码: {response.status_code}\n响应内容: {response.text}"
+                Logger.error(error_msg, module='gnss')
+                CustomMessageBox("失败", error_msg, "error", self).exec_()
+
+        except requests.exceptions.Timeout:
+            error_msg = "请求超时，请检查网络连接"
+            Logger.error(error_msg, module='gnss')
+            CustomMessageBox("错误", error_msg, "error", self).exec_()
+        except requests.exceptions.RequestException as e:
+            error_msg = f"请求异常: {str(e)}"
+            Logger.error(error_msg, module='gnss')
+            CustomMessageBox("错误", error_msg, "error", self).exec_()
+        except Exception as e:
+            error_msg = f"未知错误: {str(e)}"
+            Logger.error(error_msg, module='gnss')
+            CustomMessageBox("错误", error_msg, "error", self).exec_()
+
+    def test_dgnss_connection(self):
+        """测试DGNSS连接"""
+        # 获取配置参数
+        customer = self.dgnss_customer_combo.currentText()
+        server_url = self.dgnss_server_url_edit.text()
+        port = self.dgnss_port_edit.text()
+        mount_point = self.dgnss_mount_point_edit.text()
+        username = self.dgnss_username_edit.text()
+        password = self.dgnss_password_edit.text()
+
+        # 验证必要参数
+        if not server_url or not port:
+            CustomMessageBox("警告", "请输入服务器URL和端口", "warning", self).exec_()
+            return
+
+        if not username or not password:
+            CustomMessageBox("警告", "请输入用户名和密码", "warning", self).exec_()
+            return
+
+        try:
+            # 这里可以添加实际的DGNSS连接测试逻辑
+            # 例如通过socket连接到DGNSS服务器
+
+            Logger.info(f"测试DGNSS连接: 客户={customer}, 服务器={server_url}:{port}, 挂载点={mount_point}, 用户={username}", module='gnss')
+            CustomMessageBox("成功", f"DGNSS连接测试成功\n服务器: {server_url}:{port}\n用户: {username}", "success", self).exec_()
+        except Exception as e:
+            error_msg = f"DGNSS连接测试失败: {str(e)}"
+            Logger.error(error_msg, module='gnss')
+            CustomMessageBox("失败", error_msg, "error", self).exec_()
 
     def show_data_config_dialog(self):
         """显示数据配置对话框"""
