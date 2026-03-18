@@ -10,6 +10,19 @@ from utils.version import Version
 # 设置为试用版
 Version.set_trial_mode(True)
 
+# 设置资源目录路径
+if getattr(sys, 'frozen', False):
+    # 如果是打包后的exe
+    resources_path = os.path.join(sys._MEIPASS, '..', 'Resources')
+    _internal_path = os.path.join(sys._MEIPASS, '..')
+
+    # 首先检查Resources目录是否存在，如果存在则使用它
+    if os.path.exists(resources_path):
+        sys._MEIPASS = resources_path
+    # 否则保持默认行为，使用_internal目录
+    elif os.path.exists(_internal_path):
+        sys._MEIPASS = _internal_path
+
 def setup_qt_environment():
     # 获取 PyQt5 的安装路径
     pyqt_path = os.path.dirname(sys.modules['PyQt5'].__file__)
