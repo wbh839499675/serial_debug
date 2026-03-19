@@ -40,7 +40,6 @@ from ui.gnss_test.gnss_test_page import GNSSTestPage
 from ui.feedback.feedback_page import FeedbackPage
 
 from ui.power_analysis.power_analysis_page import PowerAnalysisPage
-from ui.oscilloscope_page import OscilloscopePage
 
 from ui.dialogs import ATCommandLibraryDialog
 from utils.logger import Logger
@@ -242,7 +241,7 @@ class MainWindow(QMainWindow):
             "🛰️ GNSS测试": GNSSTestPage,
             "🎛️ 设备测试": DeviceTestPage,
             "⚡ 功耗分析": PowerAnalysisPage,
-            "📺 虚拟示波器": OscilloscopePage,
+            #"📺 虚拟示波器": OscilloscopePage,
             "👤 问题反馈": FeedbackPage
         }
 
@@ -253,7 +252,7 @@ class MainWindow(QMainWindow):
             "🛰️ GNSS测试": "gnss",
             "🎛️ 设备测试": "device_test",
             "⚡ 功耗分析": "power_analysis",
-            "📺 虚拟示波器": "oscilloscope",
+            #"📺 虚拟示波器": "oscilloscope",
             "👤 问题反馈": "feedback"
         }
 
