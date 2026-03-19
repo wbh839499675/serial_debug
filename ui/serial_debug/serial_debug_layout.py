@@ -144,6 +144,22 @@ class SerialDebugTabLayout:
     """串口调试标签页布局管理器"""
 
     @staticmethod
+    def create_main_splitter():
+        """创建主分割器"""
+        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter.setHandleWidth(2)
+        main_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #dcdfe6;
+                width: 2px;
+            }
+            QSplitter::handle:hover {
+                background-color: #409eff;
+            }
+        """)
+        return main_splitter
+
+    @staticmethod
     def create_io_splitter():
         """创建接收/发送区域分割器"""
         io_splitter = QSplitter(Qt.Vertical)
@@ -158,6 +174,30 @@ class SerialDebugTabLayout:
             }
         """)
         return io_splitter
+
+    @staticmethod
+    def create_main_layout(parent_widget):
+        """创建主布局"""
+        layout = QVBoxLayout(parent_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        return layout
+
+    @staticmethod
+    def create_control_panel():
+        """创建控制面板"""
+        control_panel = QGroupBox("控制面板")
+        control_layout = QVBoxLayout(control_panel)
+        # 添加控制面板内容
+        return control_panel
+
+    @staticmethod
+    def create_data_display():
+        """创建数据显示区域"""
+        display_group = QGroupBox("数据显示")
+        display_layout = QVBoxLayout(display_group)
+        # 添加数据显示内容
+        return display_group
 
     @staticmethod
     def create_recv_group():
@@ -184,8 +224,20 @@ class SerialDebugTabLayout:
         auto_save_check = QCheckBox("自动保存日志")
         auto_save_check.setChecked(False)
 
-        show_line_numbers_check = QCheckBox("显示行号")
-        show_line_numbers_check.setChecked(True)
+        # 添加显示配置按钮
+        display_config_btn = QPushButton("⚙️显示配置")
+        display_config_btn.setFixedSize(80, 32)
+        display_config_btn.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                font-size: 9pt;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                border-radius: 4px;
+            }
+        """)
 
         search_btn = QPushButton("🔍 搜索")
         #search_btn.setToolTip("搜索日志")
@@ -236,13 +288,10 @@ class SerialDebugTabLayout:
             'auto_scroll': auto_scroll_check,
             'timestamp': timestamp_recv_check,
             'pause': pause_recv_check,
-            'show_line_numbers': show_line_numbers_check,
             'auto_save': auto_save_check,
             'clear': clear_recv_btn,
             'search': search_btn,
-            'waveform': waveform_check,
-            'record': record_btn,
-            'playback': playback_btn
+            'display_config': display_config_btn
         }
 
     @staticmethod
@@ -404,3 +453,46 @@ class SerialDebugTabLayout:
             'add': add_command_btn,
             'clear': clear_commands_btn
         }
+
+    @staticmethod
+    def create_display_config_dialog():
+        """创建显示配置对话框"""
+        dialog = QDialog()
+        dialog.setWindowTitle("显示配置")
+        dialog.setFixedSize(400, 300)
+
+        layout = QVBoxLayout(dialog)
+
+        # 创建配置选项
+        font_size_label = QLabel("字体大小:")
+        font_size_combo = QComboBox()
+        font_size_combo.addItems(["9pt", "10pt", "11pt", "12pt"])
+        font_size_combo.setCurrentText("10pt")
+
+        font_family_label = QLabel("字体:")
+        font_family_combo = QComboBox()
+        font_family_combo.addItems(["Consolas", "Courier New", "Monaco"])
+        font_family_combo.setCurrentText("Consolas")
+
+        # 创建按钮
+        button_layout = QHBoxLayout()
+        ok_btn = QPushButton("确定")
+        cancel_btn = QPushButton("取消")
+        button_layout.addWidget(ok_btn)
+        button_layout.addWidget(cancel_btn)
+
+        # 添加到主布局
+        layout.addWidget(font_size_label)
+        layout.addWidget(font_size_combo)
+        layout.addWidget(font_family_label)
+        layout.addWidget(font_family_combo)
+        layout.addStretch()
+        layout.addLayout(button_layout)
+
+        return dialog, {
+            'ok': ok_btn,
+            'cancel': cancel_btn,
+            'font_size': font_size_combo,
+            'font_family': font_family_combo
+        }
+

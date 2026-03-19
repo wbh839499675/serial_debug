@@ -193,7 +193,9 @@ class CommandManager(QObject):
             command_text: 命令文本，默认为空字符串
             delay: 延时时间(毫秒)，默认为1000ms
         """
+        print(f"添加命令行：{command_text}")
         if not self.commands_layout:
+            print("❌ 错误: 命令行容器未设置")
             return
 
         if command_text is None:
@@ -209,7 +211,7 @@ class CommandManager(QObject):
             return
 
         # 创建命令行容器
-        row_widget = DraggableCommandRow(parent=None, command_manager=self)
+        row_widget = DraggableCommandRow(parent=self.commands_container, command_manager=self)
         row_widget.setFixedHeight(UI_SERIAL_DEBUG['ROW_HEIGHT'])  # 设置固定高度
         row_widget.setStyleSheet("""
             QWidget {

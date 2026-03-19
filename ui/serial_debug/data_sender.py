@@ -113,7 +113,7 @@ class DataSender(QObject):
         if self.is_timer_sending:
             self.send_data()
 
-    def send_data(self, data: str = None) -> None:
+    def send_data(self, data: bytes) -> bool:
         """发送数据
 
         Args:
@@ -137,6 +137,7 @@ class DataSender(QObject):
                 # 原有逻辑：从send_edit获取数据
                 send_bytes = self._get_send_data()
                 if not send_bytes:
+                    print("没有数据要发送")
                     return
 
             # 发送数据
@@ -155,28 +156,33 @@ class DataSender(QObject):
                 if self.log_manager:
                     self.log_manager.write_sent_log(display_data)
 
+                self.data_sent.emit(data)
+                return True
         except Exception as e:
             Logger.log(f"发送数据失败: {str(e)}", "ERROR")
             self.send_failed.emit(str(e))
+            return False
 
     def _display_sent_data(self, data: str) -> None:
         """显示发送的数据"""
         if not self.recv_text:
             return
-
         display_data = data
-
         # 根据show_timestamp决定是否添加时间戳
         if self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-            # 使用蓝色显示发送数据
-            display_data = f'<span style="color: #409EFF; font-family: SimSun; font-size: 9pt;">[{timestamp}]发送{display_data}</span>'
-        else:
-            # 不显示时间戳
-            display_data = f'<span style="color: #409EFF; font-family: SimSun; font-size: 9pt;">{display_data}</span>'
+            # 使用纯文本格式，不使用HTML标签
+            display_data = f'[{timestamp}]发送{display_data}'
 
-        # 添加到接收框
-        self.recv_text.append(display_data)
+        # 使用QPlainTextEdit的方式添加文本 - 修改这里
+        cursor = self.recv_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(display_data + '\n')
+        self.recv_text.setTextCursor(cursor)
+
+        cursor = self.recv_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.recv_text.setTextCursor(cursor)
 
     def _on_send_success(self, bytes_count):
         """发送成功处理"""
@@ -191,11 +197,13 @@ class DataSender(QObject):
             bytes: 要发送的字节数据，如果获取失败返回None
         """
         if not self.send_edit:
+            print("未找到发送文本框")
             return None
 
         # 获取发送文本
         text = self.send_edit.toPlainText().strip()
         if not text:
+            print("发送文本不能为空")
             return None
 
         try:

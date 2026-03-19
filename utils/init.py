@@ -12,6 +12,7 @@ from .constants import (
 )
 from .config import ConfigManager
 from .helpers import degrees_to_dms, find_available_ports
+from .path_manager import PathManager
 
 __all__ = [
     'Logger',
@@ -22,5 +23,6 @@ __all__ = [
     'GNSS_CONSTELLATIONS',
     'ConfigManager',
     'degrees_to_dms',
-    'find_available_ports'
+    'find_available_ports',
+    'PathManager'
 ]

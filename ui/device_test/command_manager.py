@@ -5,6 +5,7 @@ import json
 import re
 import time
 from utils.logger import Logger
+from utils.path_manager import PathManager
 
 class ATCommandManager:
     """AT命令管理器"""
@@ -22,8 +23,8 @@ class ATCommandManager:
             # 开发环境
             base_path = Path(__file__).parent.parent.parent
 
-        # 命令集管理功能
-        self.config_file = base_path / "script" / "model_commands.json"
+        # 使用PathManager获取命令集文件路径
+        self.config_file = PathManager.MODEL_COMMANDS_FILE
         self.model_command_sets = self._load_command_sets()
 
     def _load_common_commands(self):

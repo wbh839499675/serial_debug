@@ -44,7 +44,7 @@ from ui.power_analysis.power_analysis_page import PowerAnalysisPage
 from ui.dialogs import ATCommandLibraryDialog
 from utils.logger import Logger
 from utils.helpers import get_system_info
-
+from utils.path_manager import PathManager
 from ui.dialogs import CustomMessageBox
 from utils.constants import UI_NAV_ITEM_WIDTH
 from utils.version import Version
@@ -68,10 +68,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"CAT1 ProTest Suite v{Version.get_version()}")
 
-        # 设置应用图标
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resources', 'icons', 'app_icon.ico')
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+        # 使用PathManager获取图标路径
+        icon_path = PathManager.ICONS_DIR / "app_icon.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         # 获取屏幕尺寸并设置窗口大小
         screen = QApplication.primaryScreen().geometry()
@@ -402,51 +402,6 @@ class MainWindow(QMainWindow):
         """更新导航按钮状态"""
         for btn, btn_callback in self.nav_buttons_dict.items():
             btn.setChecked(btn_callback == callback)
-
-    # ====== 串口相关方法 ======
-    def refresh_control_ports(self):
-        """刷新控制页面的串口列表"""
-        if hasattr(self, 'port_combo') and self.port_combo:
-            self.port_combo.clear()
-            ports = serial.tools.list_ports.comports()
-            for port in ports:
-                display_text = f"{port.device} - {port.description}"
-                self.port_combo.addItem(display_text, port.device)
-
-    def toggle_serial(self):
-        """打开/关闭串口"""
-        if not self.serial_is_open:
-            try:
-                port_name = self.port_combo.currentData()
-                baudrate = int(self.baudrate_combo.currentText())
-
-                self.serial_port = serial.Serial(
-                    port=port_name,
-                    baudrate=baudrate,
-                    timeout=1
-                )
-                self.serial_is_open = True
-                self.serial_btn.setText("⛓ 断开串口")
-                self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 24pt;")
-                self.port_combo.setEnabled(False)
-                self.baudrate_combo.setEnabled(False)
-                Logger.log(f"串口 {self.port_combo.currentText()} 已打开", 'SUCCESS', self.log_text)
-            except Exception as e:
-                CustomMessageBox("错误", f"打开串口失败: {str(e)}", "error", self).exec_()
-        else:
-            try:
-                if self.serial_port:
-                    self.serial_port.close()
-                self.serial_is_open = False
-                self.serial_btn.setText("🔗 连接串口")
-                self.serial_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 24pt;")
-                self.port_combo.setEnabled(True)
-                self.baudrate_combo.setEnabled(True)
-                Logger.log("串口已关闭", 'INFO', self.log_text)
-            except Exception as e:
-                CustomMessageBox("错误", f"关闭串口失败: {str(e)}", "error", self).exec_()
-
-        self.update_status()
 
     def turn_on_relay(self):
         """打开继电器"""

@@ -39,12 +39,13 @@ class TestCase:
         self.expected_response = expected_response
         self.timeout = timeout
         self.priority = priority
+        self.source_file = source_file
+
         self.status = "未执行"
         self.result = None
         self.error_msg = None
         self.start_time = None
         self.end_time = None
-        self.source_file = source_file
         self.is_selected = True
 
 class TestExecutor(QThread):

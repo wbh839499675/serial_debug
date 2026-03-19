@@ -12,6 +12,7 @@ from serial.tools.list_ports import comports
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from utils.logger import Logger
+from utils.path_manager import PathManager
 from ui.dialogs import CustomMessageBox
 from ui.gnss_test.static_analysis import GNSSStaticAnalysisWidget
 from ui.gnss_test.dynamic_analysis import GNSSDynamicAnalysisWidget
@@ -715,10 +716,17 @@ class GNSSTestPage(QWidget):
 
     def add_config_files(self, dialog):
         """添加配置文件"""
+
+        # 使用PathManager确保报告目录存在
+        PathManager.ensure_dir_exists(PathManager.REPORTS_DIR)
+
+        # 文件选择对话框默认路径
+        default_dir = PathManager.REPORTS_DIR
+
         file_paths, _ = QFileDialog.getOpenFileNames(
             dialog,
             "选择NMEA数据文件",
-            "",
+            str(default_dir),
             "NMEA文件 (*.log *.txt *.DAT *.nmea);;所有文件 (*.*)"
         )
 

@@ -112,7 +112,7 @@ class SerialDebugTabEvents:
     def on_show_serial_config(self):
         """显示串口配置对话框"""
         dialog = SerialConfigDialog(
-            self.tab,
+            parent=self.tab,
             baudrate=self.tab.baudrate,
             databits=self.tab.databits,
             parity=self.tab.parity,
@@ -120,6 +120,7 @@ class SerialDebugTabEvents:
             rtscts=self.tab.rtscts,
             style='default'
         )
+
         if dialog.exec_() == QDialog.Accepted:
             config = dialog.get_config()
 
@@ -243,7 +244,35 @@ class SerialDebugTabEvents:
             CustomMessageBox("警告", "请先连接串口！", "warning", self.tab).exec_()
             return
 
-        self.tab.data_sender.send_data()
+        # 获取要发送的数据
+        data = self.tab.send_edit.toPlainText().strip()
+        if not data:
+            CustomMessageBox("警告", "请输入要发送的数据！", "warning", self.tab).exec_()
+            return
+
+        # 检查是否为十六进制发送
+        if self.tab.hex_send_check.isChecked():
+            try:
+                # 尝试将十六进制字符串转换为字节
+                data_bytes = bytes.fromhex(data.replace(' ', ''))
+            except ValueError:
+                CustomMessageBox("错误", "十六进制数据格式错误！", "error", self.tab).exec_()
+                return
+        else:
+            # 普通文本发送
+            data_bytes = data.encode('utf-8')
+
+        # 检查是否添加回车换行
+        if self.tab.add_crlf_check.isChecked():
+            data_bytes += b'\r\n'
+
+        # 发送数据
+        success = self.tab.serial_manager.send_data(data_bytes)
+        if success:
+            Logger.log(f"发送数据成功: {data}", "INFO")
+        else:
+            Logger.log(f"发送数据失败: {data}", "ERROR")
+            CustomMessageBox("错误", "发送数据失败！", "error", self.tab).exec_()
 
     def on_clear_send(self):
         """清空发送数据"""
@@ -445,3 +474,26 @@ class SerialDebugTabEvents:
             self.tab.line_number_area.setVisible(False)
             # 重置TextEdit的左边距
             self.tab.recv_text.setViewportMargins(0, 0, 0, 0)
+
+    def on_show_display_config(self):
+        """显示显示配置对话框"""
+        if not hasattr(self.tab, 'display_config_dialog'):
+            # 创建显示配置对话框
+            self.tab.display_config_dialog, widgets = SerialDebugTabLayout.create_display_config_dialog()
+
+            # 设置窗口标志，包括置顶标志
+            self.tab.display_config_dialog.setWindowFlags(
+                self.tab.display_config_dialog.windowFlags() |
+                Qt.WindowStaysOnTopHint
+            )
+            # 连接确定按钮
+            widgets['ok'].clicked.connect(self._on_display_config_accepted)
+            # 连接取消按钮
+            widgets['cancel'].clicked.connect(self.tab.display_config_dialog.reject)
+
+            # 保存控件引用
+            self.tab.display_config_widgets = widgets
+        # 显示对话框
+        self.tab.display_config_dialog.show()
+        self.tab.display_config_dialog.raise_()
+        self.tab.display_config_dialog.activateWindow()

@@ -18,6 +18,7 @@ from utils.constants import get_group_style, get_combobox_style
 from utils.logger import Logger
 from ui.dialogs import CustomMessageBox, SerialConfigDialog
 from core.serial_controller import SerialController
+from utils.path_manager import PathManager
 
 class ImageLabel(QLabel):
     """支持缩放的图片标签"""
@@ -89,10 +90,9 @@ class ConfigTab(QWidget):
         self.serial_monitor = None
         self.current_model = None
 
-        # 加载模块配置
-        script_dir = Path(__file__).parent.parent.parent / "script"
-        self.model_config_file = script_dir / "model_config.json"
-        self.model_config = self._load_model_config()
+        # 使用PathManager获取配置文件路径
+        self.MOUDLE_CONFIG_FILE = PathManager.MOUDLE_CONFIG_FILE
+        self.module_config = self._load_module_config()
 
         # 保存项目根目录，用于解析资源文件路径
         self.project_root = Path(__file__).parent.parent.parent
@@ -100,17 +100,17 @@ class ConfigTab(QWidget):
         self.init_ui()
         self.init_connections()
 
-    def _load_model_config(self):
+    def _load_module_config(self):
         """加载模块配置"""
         try:
-            if self.model_config_file.exists():
-                with open(self.model_config_file, 'r', encoding='utf-8') as f:
+            if self.MOUDLE_CONFIG_FILE.exists():
+                with open(self.MOUDLE_CONFIG_FILE, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    Logger.info(f"成功加载模块配置: {self.model_config_file}", module='device_control')
+                    Logger.info(f"成功加载模块配置: {self.MOUDLE_CONFIG_FILE}", module='device_control')
                     return config
             else:
-                Logger.error(f"模块配置文件不存在: {self.model_config_file}", module='device_control')
-                CustomMessageBox("错误", f"模块配置文件不存在: {self.model_config_file}", "error", self).exec_()
+                Logger.error(f"模块配置文件不存在: {self.MOUDLE_CONFIG_FILE}", module='device_control')
+                CustomMessageBox("错误", f"模块配置文件不存在: {self.MOUDLE_CONFIG_FILE}", "error", self).exec_()
                 return {}
         except json.JSONDecodeError as e:
             Logger.error(f"模块配置文件格式错误: {str(e)}", module='device_control')
@@ -316,7 +316,7 @@ class ConfigTab(QWidget):
 
         self.model_combo = QComboBox()
         self.model_combo.addItem("请选择模块型号", None)
-        self.model_combo.addItems(self.model_config.keys())
+        self.model_combo.addItems(self.module_config.keys())
         self.model_combo.setMinimumHeight(32)
         self.model_combo.setStyleSheet(get_combobox_style('primary', 'small'))
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
@@ -445,10 +445,10 @@ class ConfigTab(QWidget):
         while self.resource_tabs.count() > 0:
             self.resource_tabs.removeTab(0)
 
-        if model_name not in self.model_config:
+        if model_name not in self.module_config:
             return
 
-        model_data = self.model_config[model_name]
+        model_data = self.module_config[model_name]
 
         # 创建引脚分布标签页
         pinout_tab = QWidget()
@@ -544,7 +544,7 @@ class ConfigTab(QWidget):
 
             # 如果是相对路径，则基于项目根目录解析
             if not path.is_absolute():
-                path = self.project_root / path
+                path = PathManager._PROJECT_ROOT / path
 
             # 检查文件是否存在
             if path.exists():
@@ -639,8 +639,8 @@ class ConfigTab(QWidget):
         self.current_model = model_name
 
         # 更新模块信息显示
-        if model_name in self.model_config:
-            model_data = self.model_config[model_name]
+        if model_name in self.module_config:
+            model_data = self.module_config[model_name]
             if 'hardware' in model_data:
                 hw = model_data['hardware']
                 info_text = f"硬件资源: GPIO: {hw['gpio_pins']}, ADC: {hw['adc_channels']}, PWM: {hw['pwm_channels']}, I2C: {'支持' if hw['i2c_support'] else '不支持'}, SPI: {'支持' if hw['spi_support'] else '不支持'}, UART: {hw['uart_channels']}, GNSS: {'支持' if hw['gnss_support'] else '不支持'}"

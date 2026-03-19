@@ -328,13 +328,13 @@ class AudioTestTab(QWidget):
             return
 
         # 获取模组配置
-        model_config = self.parent.config_tab.model_config
-        if model_name not in model_config:
+        module_config = self.parent.config_tab.module_config
+        if model_name not in module_config:
             self.log_signal.emit(f"未找到模组型号 {model_name} 的配置", "WARNING")
             return
 
         # 获取音频支持配置
-        audio_config = model_config[model_name].get('audio_support', {})
+        audio_config = module_config[model_name].get('audio_support', {})
 
         # 更新UI显示
         if 'channels' in audio_config:
@@ -1743,7 +1743,7 @@ class AudioTestTab(QWidget):
         else:
             # 其他型号隐藏音质选择
             self.recording_quality_combo.setVisible(False)
-            elf.recording_format_combo.clear()
+            self.recording_format_combo.clear()
 
     def init_connections(self):
         """初始化信号连接"""

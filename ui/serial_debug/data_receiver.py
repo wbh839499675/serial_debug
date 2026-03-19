@@ -91,6 +91,7 @@ class DataReceiver(QObject):
     def process_data(self, data: bytes) -> None:
         """处理接收到的数据"""
         if not data or self.pause_recv:
+            print("数据为空或暂停接收")
             return
 
         # 更新统计
@@ -126,14 +127,15 @@ class DataReceiver(QObject):
 
         # 处理每一行数据
         for line in lines:
-            if line.strip():  # 只处理非空行
-                # 格式化数据
-                display_data = self._format_data(line.encode('utf-8'))
-                self._display_data(display_data)
+            display_data = self._format_data(line.encode('utf-8'))
+            self._display_data(display_data)
 
-        # 在帧尾添加空行
+        # 在帧尾添加空行 - 修改这里
         if self.recv_text and lines:
-            self.recv_text.append('')
+            cursor = self.recv_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText('\n')
+            self.recv_text.setTextCursor(cursor)
 
         # 清空缓冲区
         self.receive_buffer = ""
@@ -149,23 +151,17 @@ class DataReceiver(QObject):
         if not self.recv_text:
             return
 
-        # 检查是否为空行或仅包含空白字符
-        if not data.strip():
-            # 空行直接显示，不添加时间戳和前缀
-            self.recv_text.append('')
-            return
-
         display_data = data
-
         # 添加时间戳
         if self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-            display_data = f'<span style="color: #67C23A; font-family: SimSun; font-size: 9pt;">[{timestamp}]接收{display_data}</span>'
-        else:
-            display_data = f'<span style="color: #67C23A; font-family: SimSun; font-size: 9pt;">{display_data}</span>'
+            display_data = f'[{timestamp}]接收{display_data}'
 
-        # 添加到接收框
-        self.recv_text.append(display_data)
+        # 使用QPlainTextEdit的方式添加文本
+        cursor = self.recv_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(display_data + '\n')
+        self.recv_text.setTextCursor(cursor)
 
         # 自动滚动
         if self.auto_scroll:

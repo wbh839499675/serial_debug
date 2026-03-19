@@ -2,9 +2,15 @@ import os
 import shutil
 import numpy
 import PyInstaller.__main__
+from utils.path_manager import PathManager
 
 # 项目根目录
-project_root = os.path.dirname(os.path.abspath(__file__))
+project_root = PathManager._PROJECT_ROOT
+
+# 资源目录
+resources_dir = PathManager.RESOURCES_DIR
+docs_dir = PathManager.DOCS_DIR
+
 numpy_path = os.path.dirname(numpy.__file__)
 
 # 清理旧的打包文件
@@ -143,6 +149,7 @@ UninstallDisplayName=CAT1 ProTest Suite 卸载程序
 UninstallFilesDir={{app}}\\Uninstall
 CreateUninstallRegKey=yes
 WizardStyle=modern
+WizardSizePercent=80
 ; 添加Unicode支持
 WizardImageBackColor=clWhite
 WizardSmallImageBackColor=clWhite
@@ -178,6 +185,7 @@ UninstallDisplayName=CAT1 ProTest Suite Uninstaller
 UninstallFilesDir={{app}}\\Uninstall
 CreateUninstallRegKey=yes
 WizardStyle=modern
+WizardSizePercent=80
 ; 添加Unicode支持
 WizardImageBackColor=clWhite
 WizardSmallImageBackColor=clWhite
@@ -224,9 +232,9 @@ PyInstaller.__main__.run([
     '--name=CAT1 ProTest Suite',
     '--onedir',
     '--windowed',
-    '--icon=resources/icons/app_icon.ico',
-    '--add-data=./resources;resources',
-    '--add-data=./docs;docs',
+    f'--icon={PathManager.ICONS_DIR / "app_icon.ico"}',
+    f'--add-data={resources_dir};resources',
+    f'--add-data={docs_dir};docs',
     f'--add-data={numpy_path};numpy',
     '--contents-directory=Resources',  # 更改内部资源目录名称为Resources
     '--hidden-import=pyqtgraph',

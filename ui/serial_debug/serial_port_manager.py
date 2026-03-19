@@ -1,11 +1,13 @@
 """
 串口管理模块
 """
-import serial
+
 from typing import Optional, Callable
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from utils.logger import Logger
 import time
+from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
+from PyQt5.QtCore import QObject, pyqtSignal, QIODevice
 
 class SerialPortManager(QObject):
     """串口管理类"""
@@ -25,35 +27,32 @@ class SerialPortManager(QObject):
         self.baudrate = 115200
         self.databits = 8
         self.stopbits = 1
-        self.parity = 'None'
+        self.parity = QSerialPort.NoParity
         self.rtscts = False
         self._is_connected = False
         self.auto_reconnect = True
         self._port_removed = False  # 使用下划线前缀表示私有属性
         self._reader = None
 
-    def is_connected(self) -> bool:
-        """检查串口连接状态"""
-        return self._is_connected and self.serial_port and self.serial_port.is_open
-
     def connect(self, port_name: str, baudrate: int = 115200,
            databits: int = 8, stopbits: float = 1,
-           parity: str = 'None', rtscts: bool = False) -> bool:
+           parity: QSerialPort.Parity = QSerialPort.NoParity, rtscts: bool = False) -> bool:
         """连接串口"""
         try:
             # 如果已连接，先断开
             if self.is_connected:
                 self.disconnect()
 
-            # 转换校验位
-            parity_map = {
-                'None': serial.PARITY_NONE,
-                'Even': serial.PARITY_EVEN,
-                'Odd': serial.PARITY_ODD,
-                'Mark': serial.PARITY_MARK,
-                'Space': serial.PARITY_SPACE
-            }
-            parity = parity_map.get(parity, serial.PARITY_NONE)
+            # 确保 parity 是 QSerialPort.Parity 枚举类型
+            if isinstance(parity, str):
+                parity_map = {
+                    'None': QSerialPort.NoParity,
+                    'Even': QSerialPort.EvenParity,
+                    'Odd': QSerialPort.OddParity,
+                    'Mark': QSerialPort.MarkParity,
+                    'Space': QSerialPort.SpaceParity
+                }
+                parity = parity_map.get(parity, QSerialPort.NoParity)
 
             # 保存配置
             self.port_name = port_name
@@ -64,56 +63,65 @@ class SerialPortManager(QObject):
             self.rtscts = rtscts
 
             # 创建串口对象
-            self.serial_port = serial.Serial(
-                port=port_name,
-                baudrate=baudrate,
-                bytesize=databits,
-                parity=parity,
-                stopbits=stopbits,
-                timeout=1,
-                rtscts=rtscts
-            )
+            print(f"正在连接串口 {port_name}...")
+            self.serial_port = QSerialPort()
+            self.serial_port.setPortName(port_name)
+            self.serial_port.setBaudRate(baudrate)
+            self.serial_port.setDataBits(databits)
+            self.serial_port.setStopBits(stopbits)
+            self.serial_port.setParity(parity)
+            self.serial_port.setFlowControl(QSerialPort.HardwareFlowControl if rtscts else QSerialPort.NoFlowControl)
 
-            time.sleep(0.1)  # 给串口一点时间初始化
+           # 连接信号
+            self.serial_port.readyRead.connect(self._on_data_ready)
 
-            # ✅ 验证串口是否真正打开
-            if not self.serial_port.is_open:
-                raise Exception("串口未能成功打开")
-
-            # ✅ 使用 QTimer 延迟发射信号，确保串口完全初始化
-            QTimer.singleShot(100, lambda: self.connected.emit(port_name))
-
-            Logger.log(f"串口 {port_name} 连接成功", "SUCCESS")
-            return True
+            # 打开串口
+            if self.serial_port.open(QIODevice.ReadWrite):
+                self._is_connected = True
+                self.connected.emit(port_name)
+                return True
+            else:
+                error_msg = self.serial_port.errorString()
+                self.connection_failed.emit(port_name, error_msg)
+                return False
 
         except Exception as e:
             error_msg = str(e)
-            Logger.log(f"连接串口 {port_name} 失败: {error_msg}", "ERROR")
             self.connection_failed.emit(port_name, error_msg)
             return False
-
 
     def disconnect(self) -> bool:
         """断开连接"""
         try:
-            if self.serial_port and self.serial_port.is_open:
+            if self.serial_port and self.serial_port.isOpen():
                 self.serial_port.close()
-            self._is_connected = False
-            self.disconnected.emit(self.serial_port.port if self.serial_port else "")
-            return True
+                self._is_connected = False
+                self.disconnected.emit(self.port_name)
+                return True
+            return False
         except Exception as e:
             return False
 
-    def write(self, data: bytes) -> bool:
-        """写入数据"""
-        if not self.is_connected or not self.serial_port:
-            return False
+    def is_connected(self) -> bool:
+        """检查串口连接状态"""
+        return self._is_connected and self.serial_port and self.serial_port.is_open
+
+    def send_data(self, data: bytes) -> bool:
+        """发送数据"""
         try:
-            self.serial_port.write(data)
-            return True
-        except Exception as e:
-            Logger.log(f"串口写入失败: {str(e)}", "ERROR")
+            if self.serial_port and self.serial_port.isOpen():
+                return self.serial_port.write(data) == len(data)
             return False
+        except Exception as e:
+            Logger.error(f"发送数据异常: {str(e)}", module='serial_port_manager')
+            return False
+
+    def _on_data_ready(self):
+        """数据就绪处理"""
+        if self.serial_port and self.serial_port.isOpen():
+            data = self.serial_port.readAll()
+            if data:
+                self.data_received.emit(bytes(data))
 
     def check_port_status(self, available_ports: list) -> None:
         """检查串口状态"""
