@@ -50,10 +50,10 @@ from utils.constants import UI_NAV_ITEM_WIDTH
 from utils.version import Version
 
 # ====== 导航页面宏开关配置 ======
-ENABLE_SERIAL_DEBUG_PAGE    = True      # 启用串口调试页面
+ENABLE_SERIAL_DEBUG_PAGE    = False      # 启用串口调试页面
 ENABLE_CAMERA_PAGE          = True      # 启用Camera调试页面
 ENABLE_GNSS_PAGE            = False      # 启用GNSS测试页面
-ENABLE_DEVICE_TEST_PAGE     = True      # 启用设备测试页面
+ENABLE_DEVICE_TEST_PAGE     = False      # 启用设备测试页面
 ENABLE_POWER_ANALYSIS_PAGE  = False      # 启用功耗分析页面
 ENABLE_OSCILLOSCOPE_PAGE    = False      # 启用虚拟示波器页面
 ENABLE_FEEDBACK_PAGE        = True      # 启用反馈页面

@@ -4,7 +4,7 @@ UI组件模块
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QPushButton, QComboBox, QLineEdit, QTextEdit,
-    QCheckBox, QGroupBox, QSplitter, QSizePolicy
+    QCheckBox, QGroupBox, QSplitter, QSizePolicy, QSpinBox, QScrollArea
 )
 from PyQt5.QtCore import Qt
 from utils.constants import get_page_button_style, get_group_style
@@ -30,8 +30,8 @@ class CameraUIComponents:
         self.parent_page.port_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.parent_page.port_combo.setStyleSheet("font-size: 9pt; color: #333333;")
         self.parent_page.refresh_ports_btn = QPushButton("🔄")
-        self.parent_page.refresh_ports_btn.setFixedSize(32, 32)
-        self.parent_page.refresh_ports_btn.setStyleSheet(get_page_button_style('camera', 'refresh', width=32))
+        self.parent_page.refresh_ports_btn.setFixedSize(24, 24)
+        self.parent_page.refresh_ports_btn.setStyleSheet(get_page_button_style('camera', 'refresh', width=24, height=24))
         port_layout = QHBoxLayout()
         port_layout.setSpacing(3)
         port_layout.addWidget(self.parent_page.port_combo, 1)
@@ -49,6 +49,7 @@ class CameraUIComponents:
         baudrate_label.setStyleSheet("font-size: 9pt; background-color: transparent;")
         serial_config_layout.addRow(baudrate_label, self.parent_page.baudrate_combo)
 
+        """
         # 数据位
         self.parent_page.databits_combo = QComboBox()
         self.parent_page.databits_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -78,6 +79,7 @@ class CameraUIComponents:
         stopbits_label = QLabel("停止位")
         stopbits_label.setStyleSheet("font-size: 9pt; background-color: transparent;")
         serial_config_layout.addRow(stopbits_label, self.parent_page.stopbits_combo)
+        """
 
         # 连接/断开按钮
         self.parent_page.connect_btn = QPushButton("📷连接Camera串口")
@@ -130,6 +132,7 @@ class CameraUIComponents:
         image_format_layout.addRow(image_size_label, self.parent_page.image_size_combo)
 
         # 字节顺序
+        """
         self.parent_page.byte_order_combo = QComboBox()
         self.parent_page.byte_order_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.parent_page.byte_order_combo.setStyleSheet("font-size: 9pt; color: #333333;")
@@ -137,6 +140,7 @@ class CameraUIComponents:
         byte_order_label = QLabel("字节顺序")
         byte_order_label.setStyleSheet("font-size: 9pt; background-color: transparent;")
         image_format_layout.addRow(byte_order_label, self.parent_page.byte_order_combo)
+        """
 
         # YUV格式
         self.parent_page.yuv_format_combo = QComboBox()
@@ -225,7 +229,7 @@ class CameraUIComponents:
         # 单次扫码按钮
         self.parent_page.scan_single_btn = QPushButton("📷单次扫码")
         self.parent_page.scan_single_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.parent_page.scan_single_btn.setStyleSheet(get_page_button_style('camera', 'scan_single', is_3d=True))
+        self.parent_page.scan_single_btn.setStyleSheet(get_page_button_style('camera', 'scan_single'))
         self.parent_page.scan_single_btn.clicked.connect(self.parent_page.on_single_scan)
         button_layout.addWidget(self.parent_page.scan_single_btn)
 
@@ -240,29 +244,160 @@ class CameraUIComponents:
 
         return scan_control_group
 
-    def create_preview_group(self):
-        """创建图像预览区"""
-        preview_group = QGroupBox("📺图像预览")
-        preview_group.setStyleSheet(get_group_style('primary'))
-        preview_group.setFixedWidth(655)  # 设置固定宽度为655像素
-        preview_layout = QVBoxLayout(preview_group)
-        preview_layout.setContentsMargins(5, 5, 5, 5)
+    def create_code_generation_group(self):
+        """创建码生成配置组"""
+        group = QGroupBox("🔖 码生成")
+        group.setStyleSheet(get_group_style('primary'))
 
-        # 图像显示标签
-        self.parent_page.image_label = QLabel()
-        self.parent_page.image_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.parent_page.image_label.setMinimumSize(640, 480)
-        self.parent_page.image_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.parent_page.image_label.setStyleSheet("""
-            QLabel {
-                background-color: transparent;
+        layout = QVBoxLayout(group)
+        layout.setContentsMargins(10, 15, 10, 10)
+        layout.setSpacing(10)
+
+        # 码类型选择
+        type_layout = QHBoxLayout()
+        type_label = QLabel("码类型:")
+        self.parent_page.code_type_combo = QComboBox()
+        self.parent_page.code_type_combo.addItems([
+            "QR Code", "Code 128", "Code 39", "EAN-13",
+            "EAN-8", "UPC-A", "Coda Bar", "Code93",
+            "Data Bar", "i25", "PDF417"
+        ])
+        type_layout.addWidget(type_label)
+        type_layout.addWidget(self.parent_page.code_type_combo)
+        layout.addLayout(type_layout)
+
+        # 码内容输入
+        content_layout = QHBoxLayout()
+        content_label = QLabel("码内容:")
+        self.parent_page.code_content_edit = QLineEdit()
+        self.parent_page.code_content_edit.setPlaceholderText("请输入要生成码的内容")
+        content_layout.addWidget(content_label)
+        content_layout.addWidget(self.parent_page.code_content_edit)
+        layout.addLayout(content_layout)
+
+        # 码尺寸设置
+        size_layout = QHBoxLayout()
+        width_label = QLabel("宽度:")
+        self.parent_page.code_width_spin = QSpinBox()
+        self.parent_page.code_width_spin.setRange(50, 1000)
+        self.parent_page.code_width_spin.setValue(300)
+
+        height_label = QLabel("高度:")
+        self.parent_page.code_height_spin = QSpinBox()
+        self.parent_page.code_height_spin.setRange(50, 1000)
+        self.parent_page.code_height_spin.setValue(150)
+
+        size_layout.addWidget(width_label)
+        size_layout.addWidget(self.parent_page.code_width_spin)
+        size_layout.addWidget(height_label)
+        size_layout.addWidget(self.parent_page.code_height_spin)
+        layout.addLayout(size_layout)
+
+        # 按钮区域 - 水平布局
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(5)
+
+        # 生成按钮
+        self.parent_page.generate_code_btn = QPushButton("生成码")
+        self.parent_page.generate_code_btn.setStyleSheet(get_page_button_style('camera', 'generate_code'))
+        self.parent_page.generate_code_btn.clicked.connect(self.parent_page.generate_code)
+        button_layout.addWidget(self.parent_page.generate_code_btn)
+
+        # 保存按钮
+        self.parent_page.save_code_btn = QPushButton("保存码")
+        self.parent_page.save_code_btn.setStyleSheet(get_page_button_style('camera', 'save_code'))
+        self.parent_page.save_code_btn.clicked.connect(self.parent_page.save_code)
+        button_layout.addWidget(self.parent_page.save_code_btn)
+
+        # 将按钮布局添加到主布局
+        layout.addLayout(button_layout)
+
+        # 码预览区域 - 使用滚动区域
+        preview_layout = QVBoxLayout()
+        preview_label = QLabel("码预览 (Ctrl+滚轮缩放):")
+
+        # 创建滚动区域
+        self.parent_page.code_preview_scroll = QScrollArea()
+        self.parent_page.code_preview_scroll.setWidgetResizable(True)
+        self.parent_page.code_preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.parent_page.code_preview_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.parent_page.code_preview_scroll.setStyleSheet("""
+            QScrollArea {
                 border: 1px solid #dcdfe6;
                 border-radius: 4px;
+                background-color: #f5f7fa;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #f0f0f0;
+                width: 12px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c0c0c0;
+                min-height: 20px;
+                border-radius: 6px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar:horizontal {
+                border: none;
+                background: #f0f0f0;
+                height: 12px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #c0c0c0;
+                min-width: 20px;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
             }
         """)
-        preview_layout.addWidget(self.parent_page.image_label, 0, Qt.AlignLeft | Qt.AlignTop)  # 靠左上角显示
 
-        return preview_group
+        # 创建可缩放的图片标签
+        self.parent_page.code_preview_label = ScalableImageLabel()
+
+        # 设置滚动区域的内容
+        self.parent_page.code_preview_scroll.setWidget(self.parent_page.code_preview_label)
+
+        # 添加到布局
+        preview_layout.addWidget(preview_label)
+        preview_layout.addWidget(self.parent_page.code_preview_scroll)
+        layout.addLayout(preview_layout)
+
+        # 重置缩放按钮
+        #self.reset_zoom_btn = QPushButton("重置缩放")
+        #self.reset_zoom_btn.setStyleSheet(get_button_style('default'))
+        #self.reset_zoom_btn.clicked.connect(self.code_preview_label.reset_zoom)
+        #layout.addWidget(self.reset_zoom_btn)
+
+        return group
+
+    def create_preview_group(self):
+            """创建图像预览区"""
+            preview_group = QGroupBox("📺图像预览")
+            preview_group.setStyleSheet(get_group_style('primary'))
+            preview_group.setFixedWidth(655)  # 设置固定宽度为655像素
+            preview_layout = QVBoxLayout(preview_group)
+            preview_layout.setContentsMargins(5, 5, 5, 5)
+
+            # 图像显示标签
+            self.parent_page.image_label = QLabel()
+            self.parent_page.image_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            self.parent_page.image_label.setMinimumSize(640, 480)
+            self.parent_page.image_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            self.parent_page.image_label.setStyleSheet("""
+                QLabel {
+                    background-color: transparent;
+                    border: 1px solid #dcdfe6;
+                    border-radius: 4px;
+                }
+            """)
+            preview_layout.addWidget(self.parent_page.image_label, 0, Qt.AlignLeft | Qt.AlignTop)  # 靠左上角显示
+
+            return preview_group
 
     def create_scan_result_group(self):
         """创建扫码结果显示区"""
@@ -603,3 +738,54 @@ class CameraUIComponents:
         data_layout.addWidget(self.parent_page.data_text)
 
         return data_group
+
+class ScalableImageLabel(QLabel):
+    """支持缩放的图片标签"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(300, 300)
+        self.original_pixmap = None
+        self.scale_factor = 1.0
+        self.setScaledContents(False)
+
+    def setPixmap(self, pixmap):
+        """设置图片并保存原始图片"""
+        self.original_pixmap = pixmap
+        self.update_display()
+
+    def update_display(self):
+        """更新显示的图片"""
+        if self.original_pixmap:
+            scaled_pixmap = self.original_pixmap.scaled(
+                self.original_pixmap.size() * self.scale_factor,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            super().setPixmap(scaled_pixmap)
+
+    def wheelEvent(self, event):
+        """处理鼠标滚轮事件"""
+        if event.modifiers() & Qt.ControlModifier:
+            # Ctrl+滚轮：缩放图片
+            angle = event.angleDelta().y()
+            if angle > 0:
+                # 向上滚动，放大
+                self.scale_factor *= 1.1
+            else:
+                # 向下滚动，缩小
+                self.scale_factor *= 0.9
+
+            # 限制缩放范围
+            self.scale_factor = max(0.1, min(10.0, self.scale_factor))
+            self.update_display()
+            event.accept()
+        else:
+            # 普通滚轮：传递给父类处理
+            super().wheelEvent(event)
+
+    def reset_zoom(self):
+        """重置缩放"""
+        self.scale_factor = 1.0
+        self.update_display()

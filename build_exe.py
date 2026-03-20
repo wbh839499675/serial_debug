@@ -149,7 +149,6 @@ UninstallDisplayName=CAT1 ProTest Suite 卸载程序
 UninstallFilesDir={{app}}\\Uninstall
 CreateUninstallRegKey=yes
 WizardStyle=modern
-WizardSizePercent=80
 ; 添加Unicode支持
 WizardImageBackColor=clWhite
 WizardSmallImageBackColor=clWhite
@@ -185,7 +184,6 @@ UninstallDisplayName=CAT1 ProTest Suite Uninstaller
 UninstallFilesDir={{app}}\\Uninstall
 CreateUninstallRegKey=yes
 WizardStyle=modern
-WizardSizePercent=80
 ; 添加Unicode支持
 WizardImageBackColor=clWhite
 WizardSmallImageBackColor=clWhite

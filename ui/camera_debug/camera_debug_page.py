@@ -29,6 +29,9 @@ from .camera_thread import ImageParserThread, ScanParserThread
 from .image_processor import ImageProcessor
 #from .scan_parser import ScanParser
 from .ui_component import CameraUIComponents
+import qrcode
+import barcode
+from PIL import Image
 
 # ==================== Camera调试页面 ====================
 class CameraDebugPage(QWidget):
@@ -164,9 +167,10 @@ class CameraDebugPage(QWidget):
         # 添加配置组
         config_layout.addWidget(self.ui_components.create_serial_config_group())
         config_layout.addWidget(self.ui_components.create_image_format_group())
-        config_layout.addWidget(self.ui_components.create_image_info_group())
+        #config_layout.addWidget(self.ui_components.create_image_info_group())
         config_layout.addWidget(self.ui_components.create_control_group())
         config_layout.addWidget(self.ui_components.create_scan_control_group())
+        config_layout.addWidget(self.ui_components.create_code_generation_group())
 
         # 添加弹性空间，使配置容器可拉伸
         config_layout.addStretch()
@@ -298,6 +302,7 @@ class CameraDebugPage(QWidget):
                 'Mark': serial.PARITY_MARK,
                 'Space': serial.PARITY_SPACE
             }
+            """
             parity = parity_map.get(self.parity_combo.currentText(), serial.PARITY_NONE)
 
             self.serial_port = serial.Serial(
@@ -308,6 +313,17 @@ class CameraDebugPage(QWidget):
                 parity=parity,
                 timeout=1
             )
+            """
+            # 使用默认串口配置参数
+            self.serial_port = serial.Serial(
+                port=self.port_combo.currentData(),
+                baudrate=int(self.baudrate_combo.currentText()),
+                bytesize=8,
+                stopbits=1,
+                parity=serial.PARITY_NONE,
+                timeout=1
+            )
+
             self.is_connected = True
             self.connect_btn.setText("📵断开Camera连接")
             self.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -844,8 +860,8 @@ class CameraDebugPage(QWidget):
             time_diff = current_time - self.last_frame_time
             if time_diff >= 0.5:  # 每0.5秒更新一次帧率
                 frame_rate = self.frame_count / time_diff if time_diff > 0 else 0
-                self.frame_rate_label.setText(f"{frame_rate:.1f} fps")
-                self.frame_count = 0
+                #self.frame_rate_label.setText(f"{frame_rate:.1f} fps")
+                #self.frame_count = 0
                 self.last_frame_time = current_time
 
         # 计算数据率
@@ -854,7 +870,7 @@ class CameraDebugPage(QWidget):
             if time_diff >= 1.0:
                 bytes_diff = self.total_bytes - self.last_bytes
                 data_rate = bytes_diff / time_diff / 1024 if time_diff > 0 else 0
-                self.data_rate_label.setText(f"{data_rate:.1f} KB/s")
+                #self.data_rate_label.setText(f"{data_rate:.1f} KB/s")
                 self.last_bytes = self.total_bytes
 
     def save_image(self):
@@ -1010,3 +1026,367 @@ class CameraDebugPage(QWidget):
         cursor = self.log_text.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.log_text.setTextCursor(cursor)
+
+    def generate_code(self):
+        """生成条形码或二维码"""
+        # 获取码类型
+        code_type = self.code_type_combo.currentText()
+
+        # 获取码内容
+        content = self.code_content_edit.text().strip()
+
+        if not content:
+            QMessageBox.warning(self, "警告", "请输入要生成码的内容!")
+            return
+
+        try:
+            # 获取码的尺寸
+            width = self.code_width_spin.value()
+            height = self.code_height_spin.value()
+
+            # 根据码类型生成对应的码
+            if code_type == "QR Code":
+                self.generate_qrcode(content, width, height)
+            elif code_type == "Code 128":
+                self.generate_code128(content, width, height)
+            elif code_type == "Code 39":
+                self.generate_code39(content, width, height)
+            elif code_type == "EAN-13":
+                self.generate_ean13(content, width, height)
+            elif code_type == "EAN-8":
+                self.generate_ean8(content, width, height)
+            elif code_type == "UPC-A":
+                self.generate_upca(content, width, height)
+            elif code_type == "Coda Bar":
+                self.generate_codabar(content, width, height)
+            elif code_type == "Code93":
+                self.generate_code93(content, width, height)
+            elif code_type == "Data Bar":
+                self.generate_databar(content, width, height)
+            elif code_type == "i25":
+                self.generate_i25(content, width, height)
+            elif code_type == "PDF417":
+                self.generate_PDF417(content, width, height)
+
+            Logger.info(f"已生成{code_type}码: {content}", module='camera')
+        except Exception as e:
+            Logger.error(f"生成码失败: {str(e)}", module='camera')
+            QMessageBox.critical(self, "生成失败", f"生成码失败: {str(e)}")
+
+    def save_code(self):
+        """保存生成的码"""
+        if self.code_preview_label.pixmap() is None:
+            QMessageBox.warning(self, "警告", "没有可保存的码!")
+            return
+
+        # 获取保存路径
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        code_type = self.code_type_combo.currentText()
+        default_name = f"{code_type}_{timestamp}.png"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "保存码", default_name, "图像文件 (*.png *.jpg *.bmp);;所有文件 (*.*)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 保存码图像
+            pixmap = self.code_preview_label.pixmap()
+            pixmap.save(file_path)
+
+            Logger.info(f"码已保存到 {file_path}", module='camera')
+            QMessageBox.information(self, "保存成功", f"码已保存到:\n{file_path}")
+        except Exception as e:
+            Logger.error(f"保存码失败: {str(e)}", module='camera')
+            QMessageBox.critical(self, "保存失败", f"保存码失败: {str(e)}")
+
+    def generate_qrcode(self, content, width, height):
+        """生成二维码"""
+        try:
+            import qrcode
+
+            # 创建QR码对象
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+
+            # 添加数据
+            qr.add_data(content)
+            qr.make(fit=True)
+
+            # 创建图像
+            img = qr.make_image(fill_color="black", back_color="white")
+
+            # 转换为RGB模式
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # 调整图像大小
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装qrcode库，请先安装: pip install qrcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成二维码失败: {str(e)}")
+
+    def generate_code128(self, content, width, height):
+        """生成Code 128条形码"""
+        try:
+            import barcode
+
+            # 创建Code 128条形码
+            code = barcode.get_barcode_class('code128')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成Code 128条形码失败: {str(e)}")
+
+    def generate_code39(self, content, width, height):
+        """生成Code 39条形码"""
+        try:
+            import barcode
+
+            # 创建Code 39条形码
+            code = barcode.get_barcode_class('code39')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成Code 39条形码失败: {str(e)}")
+
+    def generate_ean13(self, content, width, height):
+        """生成EAN-13条形码"""
+        try:
+            import barcode
+
+            # 创建EAN-13条形码
+            code = barcode.get_barcode_class('ean13')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成EAN-13条形码失败: {str(e)}")
+
+    def generate_ean8(self, content, width, height):
+        """生成EAN-8条形码"""
+        try:
+            import barcode
+
+            # 创建EAN-8条形码
+            code = barcode.get_barcode_class('ean8')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成EAN-8条形码失败: {str(e)}")
+
+    def generate_upca(self, content, width, height):
+        """生成UPC-A条形码"""
+        try:
+            import barcode
+
+            # 创建UPC-A条形码
+            code = barcode.get_barcode_class('upca')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成UPC-A条形码失败: {str(e)}")
+
+    def generate_codabar(self, content, width, height):
+        """生成Coda Bar条形码"""
+        try:
+            import barcode
+
+            # 创建Coda Bar条形码
+            code = barcode.get_barcode_class('codabar')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成Coda Bar条形码失败: {str(e)}")
+
+    def generate_code93(self, content, width, height):
+        """生成Code93条形码"""
+        try:
+            import barcode
+
+            # 创建Code93条形码
+            code = barcode.get_barcode_class('code93')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成Code93条形码失败: {str(e)}")
+
+    def generate_databar(self, content, width, height):
+        """生成Data Bar条形码"""
+        try:
+            import barcode
+
+            # 创建Data Bar条形码
+            code = barcode.get_barcode_class('databar')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成Data Bar条形码失败: {str(e)}")
+
+    def generate_i25(self, content, width, height):
+        """生成i25条形码"""
+        try:
+            import barcode
+
+            # 创建i25条形码
+            code = barcode.get_barcode_class('i25')
+            barcode_img = code(content, writer=barcode.writer.ImageWriter())
+
+            # 转换为PIL图像并调整大小
+            from PIL import Image
+            img = barcode_img.render()
+            img = img.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(img.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装python-barcode库，请先安装: pip install python-barcode")
+            raise
+        except Exception as e:
+            raise Exception(f"生成i25条形码失败: {str(e)}")
+
+    def generate_pdf417(self, content, width, height):
+        """生成pdf417条形码"""
+        try:
+            from pdf417gen import render, encoding
+            from PIL import Image
+
+            # 将内容编码为PDF417
+            codes = encoding.encode_bytes(content.encode('utf-8'))
+
+            # 渲染为图像
+            image = render.render_image(codes, scale=3, ratio=3, padding=10)
+
+            # 调整图像大小
+            image = image.resize((width, height))
+
+            # 转换为QPixmap并显示
+            qim = QImage(image.tobytes("raw", "RGB"), width, height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qim)
+            self.code_preview_label.setPixmap(pixmap)
+
+        except ImportError:
+            QMessageBox.critical(self, "错误", "未安装pdf417gen库，请先安装: pip install pdf417gen")
+            raise
+        except Exception as e:
+            raise Exception(f"生成pdf417条形码失败: {str(e)}")

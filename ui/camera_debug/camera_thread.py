@@ -155,10 +155,10 @@ class ScanParserThread(QThread):
 
                 # 码制类型映射
                 scan_type_map = {
-                    0: "NONE", 1: "QRCODE", 2: "EAN13", 4: "EAN8", 8: "CODE128", 16: "CODE39",
-                    32: "I25", 64: "CODEBAR", 128: "PDF417", 256: "CODE93", 512: "UPCA",
-                    1024: "UPCE", 2048: "ISBN10", 4096: "ISBN13", 8192: "EAN2", 16384: "EAN5",
-                    32768: "COMPOSITE", 65536: "DATABAR", 131072: "DATABAR_EXP"
+                    0: "MONE", 1: "PARTIAL", 2: "EAN2", 3: "EAN5", 4: "EAN8", 5: "UPCE",
+                    6: "ISBN10", 7: "UPCA", 8: "EAN13", 9: "ISBN13", 10: "COMPOSITE",
+                    11: "I25", 12: "DATABAR", 13: "DATABAREXP", 14: "CODEBAR", 15: "CODE39",
+                    16: "PDF417", 17: "QRCODE", 18: "CODE93", 19: "CODE128"
                 }
 
                 # 获取码制类型名称

@@ -866,7 +866,10 @@ PAGE_BUTTON_STYLES = {
         'refresh': ('info', 'small'),
         'scan_continuous': ('toggle', 'small'),
         'scan_stop': ('toggle', 'small'),
-        'scan_single': ('success', 'small')
+        'scan_single': ('success', 'small'),
+        'generate_code': ('success', 'small'),
+        'save_code': ('primary', 'small'),
+        'reset_zoom': ('info', 'small'),
     },
 
     # GNSS测试页面
