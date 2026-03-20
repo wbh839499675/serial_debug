@@ -103,60 +103,6 @@ class SerialDebugTab(QWidget):
         # 连接发送数据信号到接收显示
         self.data_sender.data_sent.connect(self._on_data_sent)
 
-    # connect方法可能没有用到
-    def connect(self):
-        """连接串口"""
-        if not self.port_name:
-            Logger.warning("未指定串口名称", module='serial_debug')
-            return
-
-        try:
-            # 转换校验位字符串为 QSerialPort.Parity 枚举
-            parity_map = {
-                'None': QSerialPort.NoParity,
-                'Even': QSerialPort.EvenParity,
-                'Odd': QSerialPort.OddParity,
-                'Mark': QSerialPort.MarkParity,
-                'Space': QSerialPort.SpaceParity
-            }
-            parity_enum = parity_map.get(self.parity, QSerialPort.NoParity)
-
-            # 调用串口管理器连接
-            print("尝试连接串口:", self.port_name)
-            success = self.serial_manager.connect(
-                self.port_name,
-                self.baudrate,
-                self.databits,
-                self.stopbits,
-                parity_enum,
-                self.rtscts
-            )
-
-            if success:
-                self.is_connected = True
-                self.connect_btn.setText("🔌断开连接")
-                self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'disconnect'))
-                Logger.info(f"串口 {self.port_name} 已连接", module='serial_debug')
-            else:
-                Logger.error(f"串口 {self.port_name} 连接失败", module='serial_debug')
-        except Exception as e:
-            Logger.error(f"连接串口异常: {str(e)}", module='serial_debug')
-
-    def disconnect(self):
-        """断开串口"""
-        try:
-            success = self.serial_manager.disconnect()
-
-            if success:
-                self.is_connected = False
-                self.connect_btn.setText("🔗连接")
-                self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'connect'))
-                Logger.info(f"串口 {self.port_name} 已断开", module='serial_debug')
-            else:
-                Logger.error(f"串口 {self.port_name} 断开失败", module='serial_debug')
-        except Exception as e:
-            Logger.error(f"断开串口异常: {str(e)}", module='serial_debug')
-
     def _on_connected(self, port_name: str):
         """连接成功处理"""
         Logger.log(f"已连接至串口：{port_name}", "INFO")
@@ -195,6 +141,9 @@ class SerialDebugTab(QWidget):
 
         # 设置数据接收器的波特率
         self.data_receiver.set_baudrate(self.baudrate)
+
+        # 在连接成功后设置串口对象
+        self.data_receiver.set_serial_port(self.serial_manager.serial_port)
 
     def _on_disconnected(self, port_name: str):
         """断开连接处理"""
@@ -332,7 +281,7 @@ class SerialDebugTab(QWidget):
         recv_layout.addWidget(recv_text_container)
 
         # 关键修改：设置数据接收器的文本框
-        #self.data_receiver.set_recv_text(self.recv_text)
+        self.data_receiver.set_recv_text(self.recv_text)
 
         # 创建统计标签
         stats_widget = QWidget()

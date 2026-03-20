@@ -2,6 +2,7 @@
 数据接收处理模块
 """
 from datetime import datetime
+from PyQt5.QtSerialPort import QSerialPort
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtGui import QTextCursor
@@ -41,6 +42,32 @@ class DataReceiver(QObject):
         self._idle_timer = QTimer(self)  # 空闲检测定时器
         self._idle_timer.setSingleShot(True)  # 单次触发
         self._idle_timer.timeout.connect(self._on_idle_timeout)  # 超时处理
+
+        # 添加串口对象
+        self.serial_port = None
+
+    def set_serial_port(self, serial_port: QSerialPort):
+        """设置串口对象并连接信号"""
+        self.serial_port = serial_port
+        # 连接readyRead信号到数据处理槽
+        self.serial_port.readyRead.connect(self._on_data_ready)
+
+    def _on_data_ready(self):
+        """串口有数据可读时的处理函数"""
+        print("串口有数据可读")
+        if not self.serial_port:
+            print("串口对象未设置")
+            return
+
+        if not self.serial_port.isOpen():
+            print("串口未打开")
+            return
+
+        # 读取所有可用数据
+        data = self.serial_port.readAll()
+        print(f"接收到数据: {data}")
+        if data:
+            self.process_data(data.data())
 
     def _update_idle_timeout(self):
         """根据波特率更新空闲超时时间"""
@@ -90,8 +117,10 @@ class DataReceiver(QObject):
 
     def process_data(self, data: bytes) -> None:
         """处理接收到的数据"""
+        print(f"process_data 被调用，数据长度: {len(data)}")  # 添加调试日志
+
         if not data or self.pause_recv:
-            print("数据为空或暂停接收")
+            print("数据为空或暂停接收")  # 添加调试日志
             return
 
         # 更新统计
@@ -103,13 +132,35 @@ class DataReceiver(QObject):
         try:
             data_str = data.decode('utf-8', errors='ignore')
             self.receive_buffer += data_str
+            print(f"数据添加到缓冲区: {data_str}")  # 添加调试日志
+
+            # 实时处理并显示数据
+            if '\n' in data_str:
+                # 如果数据中包含换行符，处理并显示缓冲区中的所有行
+                lines = self.receive_buffer.split('\n')
+                # 保留最后一行（可能不完整）
+                self.receive_buffer = lines[-1]
+                print(f"缓冲区分割为 {len(lines)} 行")  # 添加调试日志
+
+                # 处理并显示其他行
+                for i, line in enumerate(lines[:-1]):
+                    print(f"处理第 {i} 行: {line}")  # 添加调试日志
+                    display_data = self._format_data(line.encode('utf-8'))
+                    self._display_data(display_data)
+            else:
+                # 如果没有换行符，直接显示数据
+                print("数据中不包含换行符，直接显示")  # 添加调试日志
+                display_data = self._format_data(data)
+                self._display_data(display_data)
         except Exception as e:
             Logger.log(f"数据解码失败: {str(e)}", "ERROR")
+            print(f"数据解码异常: {str(e)}")  # 添加调试日志
             return
 
         # 重置空闲定时器，每次接收到数据都重新计时
         self._idle_timer.stop()
         self._idle_timer.start(self._idle_timeout)
+
 
     def _format_data(self, data: bytes) -> str:
             """格式化数据"""
@@ -148,26 +199,36 @@ class DataReceiver(QObject):
 
     def _display_data(self, data: str) -> None:
         """显示数据"""
+        print(f"_display_data 被调用，数据: {data}")  # 添加调试日志
+        print(f"recv_text 是否为 None: {self.recv_text is None}")  # 检查控件状态
+
         if not self.recv_text:
+            print("recv_text 为 None，无法显示数据")  # 添加调试日志
             return
 
         display_data = data
+        print(f"将要显示的数据: {display_data}")  # 添加调试日志
+
         # 添加时间戳
         if self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
             display_data = f'[{timestamp}]接收{display_data}'
+            print(f"添加时间戳后的数据: {display_data}")  # 添加调试日志
 
         # 使用QPlainTextEdit的方式添加文本
         cursor = self.recv_text.textCursor()
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(display_data + '\n')
         self.recv_text.setTextCursor(cursor)
+        print("数据已插入到文本框")  # 添加调试日志
 
         # 自动滚动
         if self.auto_scroll:
             cursor = self.recv_text.textCursor()
             cursor.movePosition(QTextCursor.End)
             self.recv_text.setTextCursor(cursor)
+            print("已自动滚动到底部")  # 添加调试日志
+
 
     def _update_recv_rate(self) -> None:
         """更新接收速率"""
