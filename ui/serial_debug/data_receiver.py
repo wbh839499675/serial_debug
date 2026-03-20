@@ -105,6 +105,13 @@ class DataReceiver(QObject):
 
         # 重新处理接收缓冲区
         lines = self.receive_buffer.split('\n')
+
+        # 只在第一行添加时间戳
+        if lines and lines[0].strip() and self.show_timestamp:
+            timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            lines[0] = f'[{timestamp}]接收{lines[0]}'
+
+        # 处理每一行数据
         for line in lines:
             if line.strip():
                 # 格式化并显示数据
@@ -131,6 +138,10 @@ class DataReceiver(QObject):
         # 将数据解码并添加到缓冲区
         try:
             data_str = data.decode('utf-8', errors='ignore')
+
+            # 检查是否是新数据帧的开始（缓冲区为空）
+            is_new_frame = not self.receive_buffer
+
             self.receive_buffer += data_str
             print(f"数据添加到缓冲区: {data_str}")  # 添加调试日志
 
@@ -145,11 +156,23 @@ class DataReceiver(QObject):
                 # 处理并显示其他行
                 for i, line in enumerate(lines[:-1]):
                     print(f"处理第 {i} 行: {line}")  # 添加调试日志
+
+                    # 如果是新数据帧的第一行且需要显示时间戳
+                    if i == 0 and is_new_frame and self.show_timestamp:
+                        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                        line = f'[{timestamp}]接收{line}'
+
                     display_data = self._format_data(line.encode('utf-8'))
                     self._display_data(display_data)
             else:
                 # 如果没有换行符，直接显示数据
                 print("数据中不包含换行符，直接显示")  # 添加调试日志
+
+                # 如果是新数据帧且需要显示时间戳
+                if is_new_frame and self.show_timestamp:
+                    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                    data_str = f'[{timestamp}]接收{data_str}'
+
                 display_data = self._format_data(data)
                 self._display_data(display_data)
         except Exception as e:
@@ -160,7 +183,6 @@ class DataReceiver(QObject):
         # 重置空闲定时器，每次接收到数据都重新计时
         self._idle_timer.stop()
         self._idle_timer.start(self._idle_timeout)
-
 
     def _format_data(self, data: bytes) -> str:
             """格式化数据"""
@@ -181,7 +203,7 @@ class DataReceiver(QObject):
             display_data = self._format_data(line.encode('utf-8'))
             self._display_data(display_data)
 
-        # 在帧尾添加空行 - 修改这里
+        # 在帧尾添加空行，确保数据帧之间有分隔
         if self.recv_text and lines:
             cursor = self.recv_text.textCursor()
             cursor.movePosition(QTextCursor.End)
@@ -195,44 +217,45 @@ class DataReceiver(QObject):
         complete_data = '\n'.join(lines)
         if complete_data:
             self.data_received.emit(complete_data)
+            self.stats_updated.emit(self.total_recv_bytes, self._calculate_rate())
         self.stats_updated.emit(self.total_recv_bytes, self.recv_rate)
 
     def _display_data(self, data: str) -> None:
         """显示数据"""
-        print(f"_display_data 被调用，数据: {data}")  # 添加调试日志
-        print(f"recv_text 是否为 None: {self.recv_text is None}")  # 检查控件状态
-
         if not self.recv_text:
-            print("recv_text 为 None，无法显示数据")  # 添加调试日志
+            print("recv_text 为 None，无法显示数据")
             return
 
-        display_data = data
-        print(f"将要显示的数据: {display_data}")  # 添加调试日志
+        # 检查是否为空行或仅包含空白字符
+        if not data.strip():
+            # 空行直接显示，不添加时间戳和前缀
+            # 使用QTextEdit兼容的方式添加空行
+            cursor = self.recv_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText('\n')
+            self.recv_text.setTextCursor(cursor)
+            return
 
-        # 添加时间戳
-        if self.show_timestamp:
-            timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-            display_data = f'[{timestamp}]接收{display_data}'
-            print(f"添加时间戳后的数据: {display_data}")  # 添加调试日志
+        # 直接显示数据，不再添加时间戳
+        display_data = data
 
         # 手动触发行号区域更新
         self.recv_text.updateLineNumberAreaWidth(0)
         self.recv_text.updateLineNumberArea(self.recv_text.contentsRect(), self.recv_text.verticalScrollBar().value())
 
-        # 使用QPlainTextEdit的方式添加文本
+        # 使用QTextEdit的方式添加文本
         cursor = self.recv_text.textCursor()
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(display_data + '\n')
         self.recv_text.setTextCursor(cursor)
-        print("数据已插入到文本框")  # 添加调试日志
+        print("数据已插入到文本框")
 
         # 自动滚动
         if self.auto_scroll:
             cursor = self.recv_text.textCursor()
             cursor.movePosition(QTextCursor.End)
             self.recv_text.setTextCursor(cursor)
-            print("已自动滚动到底部")  # 添加调试日志
-
+            print("已自动滚动到底部")
 
     def _update_recv_rate(self) -> None:
         """更新接收速率"""

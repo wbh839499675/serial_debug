@@ -3,6 +3,7 @@
 负责处理所有用户交互事件
 """
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QTextCursor
 from datetime import datetime
 from ui.dialogs import CustomMessageBox, SerialConfigDialog, FileSendDialog
 from utils.logger import Logger
@@ -245,7 +246,6 @@ class SerialDebugTabEvents:
             return
 
         # 获取要发送的数据
-        print("on_send_data......")
         data = self.tab.send_edit.toPlainText().strip()
         if not data:
             CustomMessageBox("警告", "请输入要发送的数据！", "warning", self.tab).exec_()
@@ -269,11 +269,52 @@ class SerialDebugTabEvents:
 
         # 发送数据
         success = self.tab.serial_manager.send_data(data_bytes)
+        # 显示发送的数据到接收区
+        self._display_sent_data(data, data_bytes)
         if success:
             Logger.log(f"发送数据成功: {data}", "INFO")
         else:
             Logger.log(f"发送数据失败: {data}", "ERROR")
             CustomMessageBox("错误", "发送数据失败！", "error", self.tab).exec_()
+
+    def _display_sent_data(self, data: str, data_bytes: bytes):
+        """显示发送的数据到接收区
+
+        Args:
+            data: 原始文本数据
+            data_bytes: 转换后的字节数据
+        """
+        if not self.tab.data_receiver.recv_text:
+            print("显示发送数据时接收区不存在")
+            return
+
+        try:
+            print("将发送的数据显示到接收区")
+
+            # 格式化发送数据（添加发送标识）
+            display_data = data
+            if self.tab.data_sender.show_timestamp:
+                timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                display_data = f'[{timestamp}]发送{display_data}'
+
+            # 如果是十六进制发送，转换为十六进制显示
+            if self.tab.hex_send_check.isChecked():
+                display_data = data_bytes.hex(' ').upper()
+
+            # 使用QPlainTextEdit的方式添加文本
+            cursor = self.tab.data_receiver.recv_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText(display_data + '\n')
+            self.tab.data_receiver.recv_text.setTextCursor(cursor)
+
+            # 自动滚动
+            if self.tab.data_receiver.auto_scroll:
+                cursor = self.tab.data_receiver.recv_text.textCursor()
+                cursor.movePosition(QTextCursor.End)
+                self.tab.data_receiver.recv_text.setTextCursor(cursor)
+
+        except Exception as e:
+            Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')
 
     def on_clear_send(self):
         """清空发送数据"""

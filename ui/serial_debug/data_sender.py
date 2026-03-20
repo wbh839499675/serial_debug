@@ -162,6 +162,7 @@ class DataSender(QObject):
 
             if success:
                 # 记录发送日志
+                print("数据发送成功。。。。。。")
                 display_data = send_bytes.decode('utf-8', errors='ignore')
                 if self.hex_send:
                     display_data = send_bytes.hex(' ').upper()
@@ -186,6 +187,7 @@ class DataSender(QObject):
             return
 
         display_data = data
+        print("在_display_sent_data中显示发送的数据")
         # 根据show_timestamp决定是否添加时间戳
         if self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]

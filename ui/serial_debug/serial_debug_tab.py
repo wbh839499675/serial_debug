@@ -1,9 +1,10 @@
+from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QListWidgetItem, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
     QPushButton, QCheckBox, QLineEdit, QPlainTextEdit, QSplitter, QDialog, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal, QSize
-from PyQt5.QtGui import QPainter, QColor, QTextFormat, QFont
+from PyQt5.QtGui import QPainter, QColor, QTextFormat, QFont, QTextCursor
 
 from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.serial_debug_layout import SerialDebugTabLayout
@@ -475,9 +476,11 @@ class SerialDebugTab(QWidget):
     def _on_data_sent(self, data: bytes):
         """处理发送的数据，显示到接收区"""
         if not self.data_receiver.recv_text:
+            print("显示发送数据时接收区不存在")
             return
 
         try:
+            print("将发送的数据显示到接收区")
             # 转换数据为字符串
             if isinstance(data, bytes):
                 data_str = data.decode('utf-8', errors='replace')
