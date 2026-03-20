@@ -91,6 +91,7 @@ class DataReceiver(QObject):
         """设置接收文本框"""
         self.recv_text = text_edit
 
+    # 可能没有使用到该方法
     def update_receive_display(self) -> None:
         """更新接收显示，用于显示模式改变时重新处理数据"""
         if not self.recv_text:
@@ -109,7 +110,7 @@ class DataReceiver(QObject):
         # 只在第一行添加时间戳
         if lines and lines[0].strip() and self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-            lines[0] = f'[{timestamp}]接收{lines[0]}'
+            lines[0] = f'[{timestamp}]接收←◆{lines[0]}'
 
         # 处理每一行数据
         for line in lines:
@@ -160,7 +161,7 @@ class DataReceiver(QObject):
                     # 如果是新数据帧的第一行且需要显示时间戳
                     if i == 0 and is_new_frame and self.show_timestamp:
                         timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-                        line = f'[{timestamp}]接收{line}'
+                        line = f'[{timestamp}]接收←◆{line}'
 
                     display_data = self._format_data(line.encode('utf-8'))
                     self._display_data(display_data)
@@ -171,7 +172,7 @@ class DataReceiver(QObject):
                 # 如果是新数据帧且需要显示时间戳
                 if is_new_frame and self.show_timestamp:
                     timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-                    data_str = f'[{timestamp}]接收{data_str}'
+                    data_str = f'[{timestamp}]接收←◆{data_str}'
 
                 display_data = self._format_data(data)
                 self._display_data(display_data)

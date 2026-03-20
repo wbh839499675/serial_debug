@@ -145,7 +145,12 @@ class DataSender(QObject):
                 if self.hex_send:
                     send_bytes = bytes.fromhex(data.replace(' ', ''))
                 else:
-                    send_bytes = data.encode('utf-8', errors='ignore')
+                    # 确保data是字符串类型
+                    if isinstance(data, bytes):
+                        data_str = data.decode('utf-8', errors='ignore')
+                    else:
+                        data_str = str(data)
+                    send_bytes = data_str.encode('utf-8', errors='ignore')
 
                 # 添加回车换行
                 if self.add_crlf:
@@ -158,11 +163,12 @@ class DataSender(QObject):
                     return
 
             # 发送数据
+            print(f"真实发送的数据: {send_bytes}")
             success = self.serial_manager.send_data(send_bytes)
 
             if success:
                 # 记录发送日志
-                print("数据发送成功。。。。。。")
+                print(f"数据发送成功。。。。。。{send_bytes}")
                 display_data = send_bytes.decode('utf-8', errors='ignore')
                 if self.hex_send:
                     display_data = send_bytes.hex(' ').upper()
@@ -213,7 +219,6 @@ class DataSender(QObject):
             bytes: 要发送的字节数据，如果获取失败返回None
         """
         if not self.send_edit:
-            print("未找到发送文本框")
             return None
 
         # 获取发送文本
@@ -225,6 +230,7 @@ class DataSender(QObject):
         try:
             # 处理十六进制发送
             if self.hex_send:
+                print("十六进制发送......")
                 data = bytes.fromhex(text.replace(' ', ''))
             else:
                 data = text.encode('utf-8', errors='ignore')

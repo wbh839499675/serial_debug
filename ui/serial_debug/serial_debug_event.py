@@ -295,7 +295,7 @@ class SerialDebugTabEvents:
             display_data = data
             if self.tab.data_sender.show_timestamp:
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-                display_data = f'[{timestamp}]发送{display_data}'
+                display_data = f'[{timestamp}]发送→◇{display_data}'
 
             # 如果是十六进制发送，转换为十六进制显示
             if self.tab.hex_send_check.isChecked():
