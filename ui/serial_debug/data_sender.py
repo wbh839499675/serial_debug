@@ -3,6 +3,7 @@
 """
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QTimer
+from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import QTextEdit
 from serial import SerialException
 from utils.logger import Logger
@@ -37,11 +38,11 @@ class SendWorker(QThread):
             if hasattr(self.serial_port, '_is_sending') and self.serial_port._is_sending:
                 self.error.emit("串口正在发送数据")
                 return
-            
+
             self.serial_port._is_sending = True
-            self.serial_port.write(self.data)
+            self.serial_port.send_data(self.data)
             self.serial_port._is_sending = False
-            
+
             self.finished.emit()
 
         except SerialException as e:
@@ -86,6 +87,7 @@ class DataSender(QObject):
     def set_serial_manager(self, manager) -> None:
         """设置串口管理器"""
         self.serial_manager = manager
+        #self.send_worker.set_data(manager, None)
 
     def clear_data(self) -> None:
         """清空发送数据"""
@@ -93,11 +95,11 @@ class DataSender(QObject):
             self.send_edit.clear()
 
     def start_timer_send(self, interval: int) -> None:
-        """启动定时发送
+        """启动定时发送"""
+        # 先停止之前的定时器
+        if self.is_timer_sending:
+            self.stop_timer_send()
 
-        Args:
-            interval: 发送间隔(毫秒)
-        """
         self.is_timer_sending = True
         self.timer_send.start(interval)
         Logger.log(f"启动定时发送，间隔: {interval}ms", "INFO")
@@ -110,8 +112,22 @@ class DataSender(QObject):
 
     def _on_timer_send(self) -> None:
         """定时发送超时处理"""
+        print(f"_on_timer_send 被调用，is_timer_sending: {self.is_timer_sending}")
+
         if self.is_timer_sending:
-            self.send_data()
+            print("定时发送超时")
+
+            # 检查发送文本框
+            if not self.send_edit:
+                print("发送文本框未设置")
+                return
+
+            # 获取文本框内容
+            text = self.send_edit.toPlainText()
+            print(f"发送文本框内容: '{text}'")
+
+            # 尝试发送数据
+            self.send_data(None)
 
     def send_data(self, data: bytes) -> bool:
         """发送数据
@@ -120,6 +136,7 @@ class DataSender(QObject):
             data: 要发送的数据，如果为None则从send_edit获取
         """
         if not self.serial_manager or not self.serial_manager.is_connected:
+            print("串口未连接")
             return
         try:
             # 如果提供了data参数，使用它；否则从send_edit获取
@@ -141,7 +158,7 @@ class DataSender(QObject):
                     return
 
             # 发送数据
-            success = self.serial_manager.write(send_bytes)
+            success = self.serial_manager.send_data(send_bytes)
 
             if success:
                 # 记录发送日志
@@ -167,6 +184,7 @@ class DataSender(QObject):
         """显示发送的数据"""
         if not self.recv_text:
             return
+
         display_data = data
         # 根据show_timestamp决定是否添加时间戳
         if self.show_timestamp:
@@ -178,10 +196,6 @@ class DataSender(QObject):
         cursor = self.recv_text.textCursor()
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(display_data + '\n')
-        self.recv_text.setTextCursor(cursor)
-
-        cursor = self.recv_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
         self.recv_text.setTextCursor(cursor)
 
     def _on_send_success(self, bytes_count):

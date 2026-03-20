@@ -245,6 +245,7 @@ class SerialDebugTabEvents:
             return
 
         # 获取要发送的数据
+        print("on_send_data......")
         data = self.tab.send_edit.toPlainText().strip()
         if not data:
             CustomMessageBox("警告", "请输入要发送的数据！", "warning", self.tab).exec_()

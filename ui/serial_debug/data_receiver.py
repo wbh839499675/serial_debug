@@ -215,6 +215,10 @@ class DataReceiver(QObject):
             display_data = f'[{timestamp}]接收{display_data}'
             print(f"添加时间戳后的数据: {display_data}")  # 添加调试日志
 
+        # 手动触发行号区域更新
+        self.recv_text.updateLineNumberAreaWidth(0)
+        self.recv_text.updateLineNumberArea(self.recv_text.contentsRect(), self.recv_text.verticalScrollBar().value())
+
         # 使用QPlainTextEdit的方式添加文本
         cursor = self.recv_text.textCursor()
         cursor.movePosition(QTextCursor.End)

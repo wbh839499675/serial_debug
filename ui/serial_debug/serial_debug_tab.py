@@ -103,6 +103,9 @@ class SerialDebugTab(QWidget):
         # 连接发送数据信号到接收显示
         self.data_sender.data_sent.connect(self._on_data_sent)
 
+        # 设置串口管理器
+        self.data_sender.set_serial_manager(self.serial_manager)
+
     def _on_connected(self, port_name: str):
         """连接成功处理"""
         Logger.log(f"已连接至串口：{port_name}", "INFO")
@@ -372,6 +375,13 @@ class SerialDebugTab(QWidget):
 
         send_input_layout.addLayout(send_buttons_layout)
         send_layout.addWidget(send_input_widget)
+
+        # 添加以下代码：设置发送文本框到数据发送器,解决定时发送时未设置send_edit的问题
+        if hasattr(self, 'data_sender') and self.data_sender:
+            self.data_sender.set_send_edit(self.send_edit)
+            print(f"发送文本框已设置到数据发送器: {self.send_edit}")
+        else:
+            print("警告：数据发送器未创建，无法设置发送文本框")
 
         return send_group
 
