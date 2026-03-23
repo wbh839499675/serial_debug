@@ -84,7 +84,7 @@ class CameraUIComponents:
         # 连接/断开按钮
         self.parent_page.connect_btn = QPushButton("📷连接Camera串口")
         self.parent_page.connect_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.parent_page.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect', width=270))
+        self.parent_page.connect_btn.setStyleSheet(get_page_button_style('camera', 'connect', width=270, height=32))
         self.parent_page.connect_btn.clicked.connect(self.parent_page.toggle_connection)
         serial_config_layout.addRow(self.parent_page.connect_btn)
 
@@ -376,28 +376,28 @@ class CameraUIComponents:
         return group
 
     def create_preview_group(self):
-            """创建图像预览区"""
-            preview_group = QGroupBox("📺图像预览")
-            preview_group.setStyleSheet(get_group_style('primary'))
-            preview_group.setFixedWidth(655)  # 设置固定宽度为655像素
-            preview_layout = QVBoxLayout(preview_group)
-            preview_layout.setContentsMargins(5, 5, 5, 5)
+        """创建图像预览区"""
+        preview_group = QGroupBox("📺图像预览")
+        preview_group.setStyleSheet(get_group_style('primary'))
+        #preview_group.setFixedWidth(655)  # 设置固定宽度为655像素
+        preview_layout = QVBoxLayout(preview_group)
+        preview_layout.setContentsMargins(5, 5, 5, 5)
 
-            # 图像显示标签
-            self.parent_page.image_label = QLabel()
-            self.parent_page.image_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-            self.parent_page.image_label.setMinimumSize(640, 480)
-            self.parent_page.image_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            self.parent_page.image_label.setStyleSheet("""
-                QLabel {
-                    background-color: transparent;
-                    border: 1px solid #dcdfe6;
-                    border-radius: 4px;
-                }
-            """)
-            preview_layout.addWidget(self.parent_page.image_label, 0, Qt.AlignLeft | Qt.AlignTop)  # 靠左上角显示
+        # 图像显示标签
+        self.parent_page.image_label = QLabel()
+        self.parent_page.image_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.parent_page.image_label.setMinimumSize(640, 480)
+        self.parent_page.image_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.parent_page.image_label.setStyleSheet("""
+            QLabel {
+                background-color: transparent;
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+            }
+        """)
+        preview_layout.addWidget(self.parent_page.image_label, 0, Qt.AlignLeft | Qt.AlignTop)  # 靠左上角显示
 
-            return preview_group
+        return preview_group
 
     def create_scan_result_group(self):
         """创建扫码结果显示区"""
@@ -581,38 +581,21 @@ class CameraUIComponents:
 
         return scan_result_group
 
-    def create_log_group(self):
+    def create_log_widget(self):
         """创建日志显示区"""
-        log_group = QGroupBox("📜运行日志")
-        log_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 9pt;
-                border: 2px solid #e6a23c;
-                margin-top: 8px;
-                border-radius: 6px;
-                padding-top: 15px;
-                background-color: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 8px;
-                color: #e6a23c;
-            }
-        """)
-        log_layout = QVBoxLayout(log_group)
+        # 创建日志显示区的容器
+        log_widget = QWidget()
+        log_layout = QVBoxLayout(log_widget)
         log_layout.setContentsMargins(5, 5, 5, 5)
+        log_layout.setSpacing(5)
 
         # 日志控制选项
         log_options_layout = QHBoxLayout()
         log_options_layout.setSpacing(5)
-
         self.parent_page.auto_scroll_log_check = QCheckBox("自动滚动")
         self.parent_page.auto_scroll_log_check.setChecked(True)
         self.parent_page.auto_scroll_log_check.setStyleSheet("font-size: 9pt;")
         log_options_layout.addWidget(self.parent_page.auto_scroll_log_check)
-
         log_options_layout.addStretch()
 
         # 清除日志按钮
@@ -632,7 +615,6 @@ class CameraUIComponents:
         """)
         clear_log_btn.clicked.connect(self.parent_page.clear_log)
         log_options_layout.addWidget(clear_log_btn)
-
         log_layout.addLayout(log_options_layout)
 
         # 日志显示框
@@ -653,35 +635,19 @@ class CameraUIComponents:
         """)
         log_layout.addWidget(self.parent_page.log_text)
 
-        return log_group
+        return log_widget
 
-    def create_data_group(self):
+    def create_data_widget(self):
         """创建数据接收区"""
-        data_group = QGroupBox("📥数据接收")
-        data_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 9pt;
-                border: 2px solid #e6a23c;
-                margin-top: 8px;
-                border-radius: 6px;
-                padding-top: 15px;
-                background-color: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 8px;
-                color: #e6a23c;
-            }
-        """)
-        data_layout = QVBoxLayout(data_group)
+        # 创建数据接收区的容器
+        data_widget = QWidget()
+        data_layout = QVBoxLayout(data_widget)
         data_layout.setContentsMargins(5, 5, 5, 5)
+        data_layout.setSpacing(5)
 
         # 接收选项
         options_layout = QHBoxLayout()
         options_layout.setSpacing(5)
-
         self.parent_page.hex_display_check = QCheckBox("十六进制显示")
         self.parent_page.hex_display_check.setChecked(False)
         self.parent_page.hex_display_check.setStyleSheet("font-size: 9pt;")
@@ -716,7 +682,6 @@ class CameraUIComponents:
         """)
         clear_btn.clicked.connect(self.parent_page.clear_data)
         options_layout.addWidget(clear_btn)
-
         data_layout.addLayout(options_layout)
 
         # 数据显示框
@@ -737,7 +702,7 @@ class CameraUIComponents:
         """)
         data_layout.addWidget(self.parent_page.data_text)
 
-        return data_group
+        return data_widget
 
 class ScalableImageLabel(QLabel):
     """支持缩放的图片标签"""

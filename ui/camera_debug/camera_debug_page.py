@@ -205,27 +205,50 @@ class CameraDebugPage(QWidget):
 
         right_layout.addWidget(preview_splitter)
 
-        # 创建水平分割器，用于分割日志区和数据接收区
-        bottom_splitter = QSplitter(Qt.Horizontal)
-        bottom_splitter.setHandleWidth(2)
-        bottom_splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #dcdfe6;
-                width: 2px;
+        # 创建日志和数据接收区的组框
+        bottom_group = QGroupBox("📋 日志与数据")
+        bottom_group.setStyleSheet(get_group_style('info'))
+
+        bottom_group_layout = QVBoxLayout(bottom_group)
+        bottom_group_layout.setContentsMargins(5, 5, 5, 5)
+        bottom_group_layout.setSpacing(5)
+
+        # 创建标签页，用于合并日志和数据接收区
+        bottom_tab_widget = QTabWidget()
+        bottom_tab_widget.addTab(self.ui_components.create_log_widget(), "日志")
+        bottom_tab_widget.addTab(self.ui_components.create_data_widget(), "数据接收")
+
+        # 设置标签页样式
+        bottom_tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+                background: white;
             }
-            QSplitter::handle:hover {
-                background-color: #409eff;
+            QTabBar::tab {
+                background: #f5f7fa;
+                color: #606266;
+                padding: 8px 16px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                color: #409eff;
+                border-bottom: 2px solid #409eff;
+            }
+            QTabBar::tab:hover:!selected {
+                background: #ecf5ff;
             }
         """)
 
-        bottom_splitter.addWidget(self.ui_components.create_log_group())
-        bottom_splitter.addWidget(self.ui_components.create_data_group())
+        # 将标签页添加到组框布局中
+        bottom_group_layout.addWidget(bottom_tab_widget)
 
-        # 设置分割比例（日志50%，数据50%）
-        bottom_splitter.setStretchFactor(0, 1)
-        bottom_splitter.setStretchFactor(1, 1)
+        # 将组框添加到右侧布局中
+        right_layout.addWidget(bottom_group)
 
-        right_layout.addWidget(bottom_splitter)
 
         main_splitter.addWidget(right_widget)
 

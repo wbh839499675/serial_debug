@@ -57,7 +57,17 @@ THEME_COLORS = {
     }
 }
 
-
+# 字体设置
+FONTS = {
+    'default': 'Microsoft YaHei UI',  # 默认字体
+    'mono': 'Consolas',               # 等宽字体
+    'size': {
+        'small': 9,    # 小号字体
+        'normal': 10,  # 正常字体
+        'large': 12,   # 大号字体
+        'xlarge': 14,  # 超大字体
+    }
+}
 
 # GroupBox 样式配置
 GROUP_STYLES = {
