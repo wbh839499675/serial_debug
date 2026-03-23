@@ -514,12 +514,28 @@ class LineNumberArea(QWidget):
     def __init__(self, editor):
         super().__init__(editor)
         self.editor = editor
+        self._is_destroying = False
 
     def sizeHint(self):
         return QSize(self.editor.lineNumberAreaWidth(), 0)
 
     def paintEvent(self, event):
-        self.editor.lineNumberAreaPaintEvent(event)
+        # 检查是否正在销毁
+        if self._is_destroying:
+            return
+
+        # 获取编辑器的父级SerialDebugTab对象
+        parent = self.editor.parent()
+        while parent and not isinstance(parent, SerialDebugTab):
+            parent = parent.parent()
+
+        # 检查父级对象是否存在且未在销毁
+        if parent and not getattr(parent, '_is_destroying', False):
+            try:
+                parent.lineNumberAreaPaintEvent(event)
+            except Exception as e:
+                # 捕获绘制过程中的异常，防止程序崩溃
+                pass
 
 class LineNumberTextEdit(QPlainTextEdit):
     """带行号功能的文本编辑框"""

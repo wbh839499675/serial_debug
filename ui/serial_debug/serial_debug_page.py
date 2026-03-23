@@ -50,6 +50,7 @@ class SerialDebugPage(QWidget):
         self.parent = parent
         self.device_tabs = {}  # 存储设备标签页 {port_name: (tab_widget, tab_index)}
         self.device_count = 0
+        #self._is_destroying = False
 
         # 初始化事件处理器
         self.events = SerialDebugPageEvents(self)
