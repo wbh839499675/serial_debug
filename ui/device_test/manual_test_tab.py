@@ -14,7 +14,7 @@ from PyQt5.QtGui import QFont, QColor, QTextCursor
 from utils.logger import Logger
 from ui.dialogs import CustomMessageBox
 from ui.device_test.command_manager import ATCommandManager
-from utils.constants import get_button_style
+from utils.constants import get_page_button_style, get_button_style
 
 
 class ManualTestTab(QWidget):
@@ -63,6 +63,10 @@ class ManualTestTab(QWidget):
             self.parent_window.config_tab.serial_connected.connect(self.on_serial_connected)
             self.parent_window.config_tab.serial_disconnected.connect(self.on_serial_disconnected)
 
+        # 连接串口数据接收信号
+        #if self.serial_controller:
+        #    self.serial_controller.data_received.connect(self._on_serial_data_received)
+
     def on_model_changed(self, model_name):
         """模组型号变化处理
 
@@ -95,14 +99,28 @@ class ManualTestTab(QWidget):
                 self.serial_controller = self.parent_window.config_tab.serial_controller
                 if self.at_manager:
                     self.at_manager.serial_controller = self.serial_controller
+
+                # 仅在标签页可见时连接信号
+                if self.isVisible():
+                    try:
+                        self.serial_controller.data_received.connect(self._on_serial_data_received)
+                        Logger.info("串口已连接，标签页可见，已连接数据接收信号", module='manual_test')
+                    except Exception as e:
+                        Logger.warning(f"连接信号失败: {str(e)}", module='manual_test')
             Logger.info("串口已连接，手动测试页已更新", module='manual_test')
 
     def on_serial_disconnected(self, disconnected):
         """串口断开状态变化处理"""
         if disconnected:
+            # 断开信号连接
+            if self.serial_controller:
+                try:
+                    self.serial_controller.data_received.disconnect(self._on_serial_data_received)
+                except Exception as e:
+                    Logger.warning(f"断开信号连接失败: {str(e)}", module='manual_test')
+
             # 清除串口控制器引用
             self.serial_controller = None
-            #self.at_manager.serial_controller = None
             Logger.info("串口已断开，手动测试页已更新", module='manual_test')
 
     def init_ui(self):
@@ -159,18 +177,18 @@ class ManualTestTab(QWidget):
         # 设备通电/断电按钮
         self.power_btn = QPushButton("🔌 通电")
         self.power_btn.setCheckable(True)
-        self.power_btn.setStyleSheet(get_button_style('success', width=80))
+        self.power_btn.setStyleSheet(get_page_button_style('device_test', 'power_on'))
         self.power_btn.clicked.connect(self.toggle_power)
         power_layout.addWidget(self.power_btn)
 
         # 设备开机/关机按钮
         boot_on_btn = QPushButton("▶ 开机")
-        boot_on_btn.setStyleSheet(get_button_style('primary', width=80))
+        boot_on_btn.setStyleSheet(get_page_button_style('device_test', 'boot_on'))
         boot_on_btn.clicked.connect(self.boot_on_device)
         power_layout.addWidget(boot_on_btn)
 
         boot_off_btn = QPushButton("⏹ 关机")
-        boot_off_btn.setStyleSheet(get_button_style('warning', width=80))
+        boot_off_btn.setStyleSheet(get_page_button_style('device_test', 'boot_off'))
         boot_off_btn.clicked.connect(self.boot_off_device)
         power_layout.addWidget(boot_off_btn)
 
@@ -178,7 +196,7 @@ class ManualTestTab(QWidget):
 
         # 设备复位按钮
         reset_btn = QPushButton("🔄 复位")
-        reset_btn.setStyleSheet(get_button_style('info', width=80))
+        reset_btn.setStyleSheet(get_page_button_style('device_test', 'reset'))
         reset_btn.clicked.connect(self.reset_device)
         power_layout.addWidget(reset_btn)
 
@@ -451,7 +469,7 @@ class ManualTestTab(QWidget):
                 padding: 10px;
                 font-family: 'Consolas', 'Monaco', monospace;
                 font-size: 10pt;
-                background-color: #f5f7fa;
+                background-color: black;
             }
         """)
         layout.addWidget(self.response_text, 1)
@@ -469,7 +487,7 @@ class ManualTestTab(QWidget):
             success, message = self.relay_controller.turn_on()
             if success:
                 self.power_btn.setText("⭕ 断电")
-                self.power_btn.setStyleSheet(get_button_style('danger'))
+                self.power_btn.setStyleSheet(get_page_button_style('device_test', 'power_off'))
                 Logger.info("设备通电成功", module='manual_test')
             else:
                 # 恢复按钮状态
@@ -481,7 +499,7 @@ class ManualTestTab(QWidget):
             success, message = self.relay_controller.turn_off()
             if success:
                 self.power_btn.setText("🔌 通电")
-                self.power_btn.setStyleSheet(get_button_style('success'))
+                self.power_btn.setStyleSheet(get_page_button_style('device_test', 'power_on'))
                 Logger.info("设备断电成功", module='manual_test')
             else:
                 # 恢复按钮状态
@@ -508,7 +526,7 @@ class ManualTestTab(QWidget):
 
         # 发送开机命令
         try:
-            self.serial_controller.write("AT+CPWROFF=1,1\r\n")
+            self.serial_controller.write_data("AT+CPWROFF=1,1\r\n")
             Logger.info("已发送开机命令", module='manual_test')
         except Exception as e:
             Logger.error(f"发送开机命令失败: {str(e)}", module='manual_test')
@@ -522,7 +540,7 @@ class ManualTestTab(QWidget):
 
         # 发送关机命令
         try:
-            self.serial_controller.write("AT+CPWROFF\r\n")
+            self.serial_controller.write_data("AT+CPWROFF\r\n")
             Logger.info("已发送关机命令", module='manual_test')
         except Exception as e:
             Logger.error(f"发送关机命令失败: {str(e)}", module='manual_test')
@@ -554,7 +572,7 @@ class ManualTestTab(QWidget):
 
         if reply == QDialogButtonBox.Yes:
             try:
-                self.serial_controller.write("AT+RESET\r\n")
+                self.serial_controller.write_data("AT+RESET\r\n")
                 Logger.info("已发送复位命令", module='manual_test')
                 CustomMessageBox("成功", "设备复位命令已发送", "info", self).exec_()
             except Exception as e:
@@ -578,26 +596,42 @@ class ManualTestTab(QWidget):
             self.command_combo.addItems(self.command_history)
             self.command_combo.setCurrentText(command)
 
-        # 清空接收缓冲区
-        self.serial_controller.clear_buffers()
+        # 连接数据接收信号
+        #self.serial_controller.data_received.connect(self._on_command_response)
 
         # 发送命令
-        self.serial_controller.write(f"{command}\r\n")
+        self.serial_controller.write_data(f"{command}\r\n")
 
-        # 等待响应
-        response = ""
+        # 显示发送命令
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        cursor = self.response_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
 
-        while True:
-            if self.serial_controller.available() > 0:
-                data = self.serial_controller.read_all()
-                if data:
-                    response += data.decode('utf-8', errors='ignore')
-                    # 检查是否收到完整的响应（包含OK或ERROR）
-                    if 'OK' in response or 'ERROR' in response:
-                        break
-            time.sleep(0.01)
+        if self.syntax_highlight_check.isChecked():
+            send_html = f"<span style='color: #409eff; font-weight: bold;'>[{timestamp}] 发送: {command}</span><br>"
+            cursor.insertHtml(send_html)
+        else:
+            cursor.insertText(f"[{timestamp}] 发送: {command}\n")
+
+        self.response_text.setTextCursor(cursor)
+        if self.auto_scroll_check.isChecked():
+            self.response_text.ensureCursorVisible()
+
+    def _on_serial_data_received(self, data: str):
+        """处理串口接收的数据"""
+        # 显示接收的数据
+        # 将bytes类型转换为str类型
+        data_str = data.decode('utf-8', errors='ignore')
+        print(f"显示串口接收到的数据: {data_str}")
+        self.display_response("", data_str)
+
+    #def _on_command_response(self, data: str):
+    #    """处理命令响应"""
+    #    # 断开信号连接，避免重复处理
+    #    self.serial_controller.data_received.disconnect(self._on_command_response)
+
         # 显示响应
-        self.display_response(command, response)
+    #    self.display_response("", data)
 
     def clear_command_history(self):
         """清除命令历史"""
@@ -606,7 +640,12 @@ class ManualTestTab(QWidget):
         Logger.info("命令历史已清除", module='manual_test')
 
     def display_response(self, command, response):
-        """显示响应"""
+        """显示响应
+
+        Args:
+            command: 发送的命令
+            response: 接收的响应数据（str类型）
+        """
         # 添加时间戳
         timestamp = datetime.now().strftime('%H:%M:%S')
 
@@ -617,8 +656,9 @@ class ManualTestTab(QWidget):
         if self.syntax_highlight_check.isChecked():
             # 语法高亮模式
             # 显示发送命令
-            send_html = f"<span style='color: #409eff; font-weight: bold;'>[{timestamp}] 发送: {command}</span><br>"
-            cursor.insertHtml(send_html)
+            if command:
+                send_html = f"<span style='color: #409eff; font-weight: bold;'>[{timestamp}] 发送: {command}</span><br>"
+                cursor.insertHtml(send_html)
 
             # 显示接收响应
             if response:
@@ -643,7 +683,10 @@ class ManualTestTab(QWidget):
         else:
             # 非语法高亮模式
             # 构建显示文本
-            display_text = f"[{timestamp}] 发送: {command}\n"
+            if command:
+                display_text = f"[{timestamp}] 发送: {command}\n"
+            else:
+                display_text = ""
 
             if response:
                 # 处理响应数据中的换行符
@@ -653,6 +696,12 @@ class ManualTestTab(QWidget):
                 display_text += f"[{timestamp}] 接收: 无响应\n"
 
             cursor.insertText(display_text)
+
+        # 自动滚动
+        if self.auto_scroll_check.isChecked():
+            self.response_text.setTextCursor(cursor)
+            self.response_text.ensureCursorVisible()
+
 
         # 自动滚动
         if self.auto_scroll_check.isChecked():
@@ -688,6 +737,27 @@ class ManualTestTab(QWidget):
             CustomMessageBox("成功", "已复制到剪贴板", "info", self).exec_()
             Logger.info("响应内容已复制", module='manual_test')
 
+    def showEvent(self, event):
+        """标签页显示事件"""
+        super().showEvent(event)
+        # 标签页显示时连接信号
+        if self.serial_controller and self.serial_controller.is_connected:
+            try:
+                self.serial_controller.data_received.connect(self._on_serial_data_received)
+                Logger.info("标签页显示，已连接串口数据接收信号", module='manual_test')
+            except Exception as e:
+                Logger.warning(f"连接信号失败: {str(e)}", module='manual_test')
+
+    def hideEvent(self, event):
+        """标签页隐藏事件"""
+        super().hideEvent(event)
+        # 标签页隐藏时断开信号
+        if self.serial_controller:
+            try:
+                self.serial_controller.data_received.disconnect(self._on_serial_data_received)
+                Logger.info("标签页隐藏，已断开串口数据接收信号", module='manual_test')
+            except Exception as e:
+                Logger.warning(f"断开信号失败: {str(e)}", module='manual_test')
 
 class QFlowLayout(QLayout):
     def __init__(self, parent=None, margin=-1, spacing=-1, hspacing=-1, vspacing=-1):

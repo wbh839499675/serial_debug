@@ -152,11 +152,6 @@ class ConfigTab(QWidget):
         model_select_card = self.create_model_select_card()
         scroll_layout.addWidget(model_select_card)
 
-        # 数据监控卡片
-        #data_monitor_card = self.create_data_monitor_card()
-        #data_monitor_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        #scroll_layout.addWidget(data_monitor_card, 1)
-
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
@@ -586,11 +581,11 @@ class ConfigTab(QWidget):
             # 如果串口已连接，则重新连接以应用新配置
             if self.serial_controller and self.serial_controller.is_connected:
                 # 先断开连接
-                self.serial_controller.close()
+                self.serial_controller.close_port()
                 # 使用新配置重新连接
                 port_name = self.port_combo.currentData()
                 if port_name:
-                    self.serial_controller.open(port_name, dialog.baudrate)
+                    self.serial_controller.open_port(port_name, dialog.baudrate)
                     Logger.info(f"串口参数已更新并重新连接: 波特率={dialog.baudrate}", module='serial')
             else:
                 Logger.info(f"串口参数已更新: 波特率={dialog.baudrate}", module='serial')
@@ -687,7 +682,7 @@ class ConfigTab(QWidget):
 
         # 连接串口
         if self.serial_controller:
-            success = self.serial_controller.open(port_name, baudrate)
+            success = self.serial_controller.open_port(port_name, baudrate)
 
             if success:
                 self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 20pt;")
@@ -711,7 +706,7 @@ class ConfigTab(QWidget):
 
         # 断开串口
         if self.serial_controller:
-            success = self.serial_controller.close()
+            success = self.serial_controller.close_port()
 
             if success:
                 self.serial_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 20pt;")

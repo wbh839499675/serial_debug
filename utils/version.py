@@ -10,7 +10,7 @@ class Version:
     PRODUCTION_VERSION = "1.0.0"
 
     # 试用版版本号
-    TRIAL_VERSION = "1.0.2-beta"
+    TRIAL_VERSION = "1.0.3-beta"
 
     # 当前版本类型
     IS_TRIAL = False  # True表示试用版，False表示正式版
@@ -28,4 +28,8 @@ class Version:
 #1.0.2-beta
 """
 1.修改cmaera界面布局，日志和数据接收做到一个标签页中
+"""
+#1.0.3-beta
+"""
+1.修改设备测试标签页功能
 """

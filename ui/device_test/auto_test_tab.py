@@ -28,7 +28,9 @@ from PyQt5.QtChart import (
 from utils.logger import Logger
 from ui.dialogs import CustomMessageBox
 from ui.device_test.command_manager import ATCommandManager
-from utils.constants import get_button_style
+from utils.constants import (
+    get_button_style, get_group_style, get_text_edit_style, get_page_button_style
+)
 from core.tester import TestResultAnalyzer
 
 class TestCase:
@@ -53,10 +55,12 @@ class TestExecutor(QThread):
     test_started = pyqtSignal()
     test_finished = pyqtSignal()
     test_progress = pyqtSignal(int, int)  # 当前进度, 总进度
+    loop_progress = pyqtSignal(int, int)  # 循环进度信号，参数为当前循环次数和总循环次数
     case_started = pyqtSignal(str)  # 添加测试用例开始信号，参数为测试用例名称
     case_finished = pyqtSignal(dict)  # 测试用例结果
     log_message = pyqtSignal(str, str)  # 日志消息, 级别
     cases_reset = pyqtSignal()  # 测试用例状态重置信号
+    timeout_occurred = pyqtSignal(str)  # 超时信号，参数为测试用例名称
 
     def __init__(self, serial_controller):
         super().__init__()
@@ -67,6 +71,12 @@ class TestExecutor(QThread):
         self.loop_count = 1
         self.current_loop = 0
         self.command_delay = 0.1
+
+        # 添加响应处理相关属性
+        self._response_buffer = []
+        self._response_received = None
+        self._data_lock = threading.Lock()
+        self._current_case = None
 
     def set_test_cases(self, cases):
         """设置测试用例"""
@@ -105,6 +115,9 @@ class TestExecutor(QThread):
         for loop in range(self.loop_count):
             self.current_loop = loop + 1
 
+            # 发送循环进度信号
+            self.loop_progress.emit(self.current_loop, self.loop_count)
+
             # 每次循环开始前重置所有测试用例状态
             for case in self.test_cases:
                 case.status = "未执行"
@@ -133,6 +146,13 @@ class TestExecutor(QThread):
 
                 # 执行该文件下的所有测试用例
                 for case in cases:
+                    # 检查暂停状态
+                    while self.is_paused and self.is_running:
+                        time.sleep(0.1)
+
+                    if not self.is_running:
+                        break
+
                     # 发送测试用例开始信号
                     self.case_started.emit(case.name)
 
@@ -160,38 +180,77 @@ class TestExecutor(QThread):
     def execute_case(self, case):
         """执行单个测试用例"""
         try:
+            # 保存当前用例引用
+            self._current_case = case
+
+            # 初始化响应处理
+            self._response_buffer = []
+            self._response_received = threading.Event()
+
             # 发送命令
             self.serial_controller.clear_buffers()
-            self.serial_controller.write(f"{case.command}\r\n")
+            self.serial_controller.write_data(f"{case.command}\r\n")
 
-            # 等待响应
-            response = ""
+            # 连接信号
+            self.serial_controller.data_received.connect(
+                self._on_data_received,
+                Qt.DirectConnection
+            )
+
+            # 等待响应或超时
+            timeout_sec = case.timeout / 1000.0
             start_time = time.time()
 
-            # 将毫秒转换为秒
-            timeout_sec = case.timeout / 1000.0
+            # 轮询检查事件状态
+            while not self._response_received.is_set() and (time.time() - start_time) < timeout_sec:
+                # 检查暂停状态
+                while self.is_paused and self.is_running:
+                    time.sleep(0.1)
+                    # 暂停时调整超时时间
+                    timeout_sec += 0.1
 
-            while time.time() - start_time < timeout_sec:
-                if self.serial_controller.available() > 0:
-                    data = self.serial_controller.read_all()
-                    if data:
-                        response += data.decode('utf-8', errors='ignore')
-                        if 'OK' in response or 'ERROR' in response:
-                            break
-                time.sleep(0.01)
+                if not self.is_running:
+                    break
 
-            # 确保响应不为空
-            if not response:
-                response = "无响应"
+                self._response_received.wait(0.1)
 
-            # 断言判断
-            if case.expected_response in response:
-                case.status = "通过"
-                case.result = True
-            else:
+            # 断开信号连接
+            try:
+                self.serial_controller.data_received.disconnect(self._on_data_received)
+            except Exception:
+                pass
+
+            # 检查是否被停止
+            if not self.is_running:
+                case.status = "已取消"
+                case.result = False
+                case.error_msg = "测试被停止"
+                return {
+                    'command': case.command,
+                    'response': "测试被停止",
+                    'passed': False,
+                    'error_msg': "测试被停止"
+                }
+
+            # 检查是否超时
+            if not self._response_received.is_set():
+                self.timeout_occurred.emit(case.name)
+                response = ''.join(self._response_buffer) if self._response_buffer else "无响应（超时）"
                 case.status = "失败"
                 case.result = False
-                case.error_msg = f"预期响应: {case.expected_response}, 实际响应: {response}"
+                case.error_msg = f"响应超时（{case.timeout}ms）"
+            else:
+                # 合并响应数据
+                response = ''.join(self._response_buffer)
+
+                # 断言判断
+                if case.expected_response in response:
+                    case.status = "通过"
+                    case.result = True
+                else:
+                    case.status = "失败"
+                    case.result = False
+                    case.error_msg = f"预期响应: {case.expected_response}, 实际响应: {response}"
 
             return {
                 'command': case.command,
@@ -206,14 +265,32 @@ class TestExecutor(QThread):
             case.error_msg = str(e)
             return {
                 'command': case.command,
-                'response': f"异常: {str(e)}",  # 确保异常也被记录
+                'response': f"异常: {str(e)}",
                 'passed': False,
                 'error_msg': str(e)
             }
 
+    def _on_data_received(self, data: bytes):
+        """处理接收到的数据"""
+        print("打印出自动测试接收到的数据: ", data)
+        try:
+            with self._data_lock:
+                response_str = data.decode('utf-8', errors='ignore')
+                self._response_buffer.append(response_str)
+
+                # 检查是否收到完整响应
+                if 'OK' in response_str or 'ERROR' in response_str:
+                    if self._response_received:
+                        self._response_received.set()
+        except Exception as e:
+            self.log_message.emit(f"解码响应数据失败: {str(e)}", "ERROR")
+
     def stop(self):
         """停止测试"""
         self.is_running = False
+        if self.is_paused:
+            self.is_paused = False
+            self.pause_btn.setText("恢复测试")
 
     def pause(self):
         """暂停测试"""
@@ -338,7 +415,7 @@ class AutoTestTab(QWidget):
         self.case_tree.setIndentation(20)
 
         # 设置列宽
-        self.case_tree.setColumnWidth(0, 500)  # 测试用例列宽
+        self.case_tree.setColumnWidth(0, 300)  # 测试用例列宽
         self.case_tree.setColumnWidth(1, 60)  # 状态列宽
         self.case_tree.setColumnWidth(2, 60)   # 优先级列宽
 
@@ -358,33 +435,33 @@ class AutoTestTab(QWidget):
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
 
-        import_btn = QPushButton("📥 导入用例")
-        import_btn.setMinimumHeight(32)
-        import_btn.setStyleSheet(get_button_style('primary'))
+        import_btn = QPushButton("📥 导入")
+        import_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        import_btn.setStyleSheet(get_page_button_style('device_test', 'import', width=64))
         import_btn.clicked.connect(self.import_test_cases)
         button_layout.addWidget(import_btn)
 
-        export_btn = QPushButton("📤 导出用例")
-        export_btn.setMinimumHeight(32)
-        export_btn.setStyleSheet(get_button_style('success'))
+        export_btn = QPushButton("📤 导出")
+        export_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        export_btn.setStyleSheet(get_page_button_style('device_test', 'export', width=64))
         export_btn.clicked.connect(self.export_test_cases)
         button_layout.addWidget(export_btn)
 
-        add_btn = QPushButton("➕ 新增用例")
-        add_btn.setMinimumHeight(32)
-        add_btn.setStyleSheet(get_button_style('info'))
+        add_btn = QPushButton("➕ 新增")
+        export_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        add_btn.setStyleSheet(get_page_button_style('device_test', 'add', width=64))
         add_btn.clicked.connect(self.add_test_case)
         button_layout.addWidget(add_btn)
 
-        edit_btn = QPushButton("✏️ 编辑用例")
-        edit_btn.setMinimumHeight(32)
-        edit_btn.setStyleSheet(get_button_style('warning'))
+        edit_btn = QPushButton("✏️ 编辑")
+        edit_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        edit_btn.setStyleSheet(get_page_button_style('device_test', 'edit', width=64))
         edit_btn.clicked.connect(self.edit_test_case)
         button_layout.addWidget(edit_btn)
 
-        delete_btn = QPushButton("🗑️ 删除用例")
-        delete_btn.setMinimumHeight(32)
-        delete_btn.setStyleSheet(get_button_style('danger'))
+        delete_btn = QPushButton("🗑️ 删除")
+        delete_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        delete_btn.setStyleSheet(get_page_button_style('device_test', 'delete', width=64))
         delete_btn.clicked.connect(self.delete_test_case)
         button_layout.addWidget(delete_btn)
 
@@ -474,43 +551,23 @@ class AutoTestTab(QWidget):
         control_layout.addWidget(self.delay_spin, 0, 3)
 
         # 控制按钮
-        self.start_btn = QPushButton("开始测试")
-        self.start_btn.clicked.connect(self.start_test)
-        control_layout.addWidget(self.start_btn, 1, 0)
-
-        self.pause_btn = QPushButton("暂停测试")
-        self.pause_btn.clicked.connect(self.pause_test)
-        self.pause_btn.setEnabled(False)
-        control_layout.addWidget(self.pause_btn, 1, 1)
-
-        self.stop_btn = QPushButton("停止测试")
-        self.stop_btn.clicked.connect(self.stop_test)
-        self.stop_btn.setEnabled(False)
-        control_layout.addWidget(self.stop_btn, 1, 2)
-
-        layout.addWidget(control_group)
-
-        # 控制按钮
         self.start_btn = QPushButton("▶ 开始测试")
-        self.start_btn.setMinimumHeight(36)
-        self.start_btn.setMinimumWidth(120)
-        self.start_btn.setStyleSheet(get_button_style('primary'))
+        self.start_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.start_btn.setStyleSheet(get_page_button_style('device_test', 'start_test'))
         self.start_btn.clicked.connect(self.start_test)
         control_layout.addWidget(self.start_btn, 1, 0)
 
         self.pause_btn = QPushButton("⏸ 暂停测试")
-        self.pause_btn.setMinimumHeight(36)
-        self.pause_btn.setMinimumWidth(120)
         self.pause_btn.setEnabled(False)
-        self.pause_btn.setStyleSheet(get_button_style('warning'))
+        self.pause_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.pause_btn.setStyleSheet(get_page_button_style('device_test', 'pause_test'))
         self.pause_btn.clicked.connect(self.pause_test)
         control_layout.addWidget(self.pause_btn, 1, 1)
 
         self.stop_btn = QPushButton("⏹ 停止测试")
-        self.stop_btn.setMinimumHeight(36)
-        self.stop_btn.setMinimumWidth(120)
         self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet(get_button_style('danger'))
+        self.stop_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.stop_btn.setStyleSheet(get_page_button_style('device_test', 'stop_test'))
         self.stop_btn.clicked.connect(self.stop_test)
         control_layout.addWidget(self.stop_btn, 1, 2)
 
@@ -563,23 +620,24 @@ class AutoTestTab(QWidget):
 
         # 实时监控与日志
         monitor_group = QGroupBox("监控与日志")
-        monitor_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                font-size: 11pt;
-                border: 2px solid #e6a23c;
-                border-radius: 8px;
-                margin-top: 15px;
-                padding-top: 20px;
-                background-color: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 12px 0 12px;
-                color: #e6a23c;
-            }
-        """)
+        monitor_group.setStyleSheet(get_group_style('info'))
+        #monitor_group.setStyleSheet("""
+        #    QGroupBox {
+        #        font-weight: bold;
+        #        font-size: 11pt;
+        #        border: 2px solid #e6a23c;
+        #        border-radius: 8px;
+        #        margin-top: 15px;
+        #        padding-top: 20px;
+        #        background-color: black;
+        #    }
+        #    QGroupBox::title {
+        #        subcontrol-origin: margin;
+        #        left: 15px;
+        #        padding: 0 12px 0 12px;
+        #        color: #e6a23c;
+        #    }
+        #""")
         monitor_layout = QVBoxLayout(monitor_group)
         monitor_layout.setSpacing(10)
 
@@ -588,16 +646,17 @@ class AutoTestTab(QWidget):
         self.log_text.setReadOnly(True)
         self.log_text.setMinimumHeight(200)
         self.log_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.log_text.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #dcdfe6;
-                border-radius: 4px;
-                padding: 10px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 10pt;
-                background-color: #f5f7fa;
-            }
-        """)
+        self.log_text.setStyleSheet(get_text_edit_style('dark'))
+        #self.log_text.setStyleSheet("""
+        #    QTextEdit {
+        #        border: 1px solid #dcdfe6;
+        #        border-radius: 4px;
+        #        padding: 10px;
+        #        font-family: 'Consolas', 'Monaco', monospace;
+        #        font-size: 10pt;
+        #        background-color: #f5f7fa;
+        #    }
+        #""")
         monitor_layout.addWidget(self.log_text)
 
         # 日志控制
@@ -1055,7 +1114,7 @@ class AutoTestTab(QWidget):
                 self.case_tree.expand(index)
 
         # 设置列宽
-        self.case_tree.setColumnWidth(0, 500)  # 测试用例列宽
+        self.case_tree.setColumnWidth(0, 300)  # 测试用例列宽
         self.case_tree.setColumnWidth(1, 60)  # 状态列宽
         self.case_tree.setColumnWidth(2, 60)   # 优先级列宽
 
@@ -1157,12 +1216,14 @@ class AutoTestTab(QWidget):
         self.test_executor.case_finished.connect(self.on_case_finished)
         self.test_executor.log_message.connect(self.on_log_message)
         self.test_executor.cases_reset.connect(self.on_cases_reset)
+        self.test_executor.timeout_occurred.connect(self.on_timeout_occurred)
+        self.test_executor.loop_progress.connect(self.on_loop_progress)
 
         # 更新UI状态
         self.start_btn.setEnabled(False)
         self.pause_btn.setEnabled(True)
         self.stop_btn.setEnabled(True)
-        self.status_label.setText("状态: 运行中")
+        self.status_label.setText("状态: 就绪")
 
         # 清空结果
         self.test_results = []
@@ -1207,6 +1268,10 @@ class AutoTestTab(QWidget):
             # 确保UI状态恢复
             self.on_test_finished()
 
+    def on_loop_progress(self, current_loop, total_loop):
+        """处理循环进度更新"""
+        self.status_label.setText(f"状态: 运行中 (第 {current_loop}/{total_loop} 轮循环)")
+
     def highlight_current_case(self, case_name: str):
         """高亮显示当前执行的测试用例"""
         # 保存当前高亮的测试用例名称
@@ -1247,7 +1312,7 @@ class AutoTestTab(QWidget):
 
     def on_test_started(self):
         """测试开始处理"""
-        self.status_label.setText("状态: 运行中")
+        self.status_label.setText("状态: 准备中")
         self.on_log_message("测试开始", "INFO")
 
     def on_test_finished(self):
@@ -1255,6 +1320,7 @@ class AutoTestTab(QWidget):
         self.start_btn.setEnabled(True)
         self.pause_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
+        self.pause_btn.setText("暂停测试")
         self.status_label.setText("状态: 已完成")
         self.on_log_message("测试完成", "INFO")
 
@@ -1381,6 +1447,19 @@ class AutoTestTab(QWidget):
         # 更新所有测试用例的状态显示
         for case in self.test_cases:
             self.update_case_status(case)
+
+    def on_timeout_occurred(self, case_name: str):
+        """处理测试用例超时"""
+        self.on_log_message(f"用例超时: {case_name}", "WARNING")
+
+        # 查找对应的测试用例
+        for case in self.test_cases:
+            if case.name == case_name:
+                case.status = "失败"
+                case.result = False
+                case.error_msg = f"响应超时（{case.timeout}ms）"
+                self.update_case_status(case)
+                break
 
     def clear_log(self):
         """清空日志"""

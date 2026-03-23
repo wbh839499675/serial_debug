@@ -20,7 +20,7 @@ from core.serial_controller import SerialController
 ENABLE_CONFIG_TAB    = True      # 启用设备控制页
 ENABLE_MANUAL_TAB    = True     # 启用手动测试页
 ENABLE_AUTO_TAB      = True      # 启用自动化测试页
-ENABLE_AUDIO_TAB     = True      # 启用音频测试页
+ENABLE_AUDIO_TAB     = False      # 启用音频测试页
 ENABLE_NETWORK_TAB   = False      # 启用网络测试页
 ENABLE_DATA_TAB      = False      # 启用数据业务测试页
 ENABLE_SMS_TAB       = False      # 启用短信测试页

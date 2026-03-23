@@ -67,11 +67,11 @@ class SerialController(QObject):
         #self.read_thread = None
         #self.is_connected = False
 
-        # 添加串口参数属性
-        #self.baudrate = 115200
-        #self.databits = 8
-        #self.stopbits = 1
-        #self.parity = 'None'
+        # 添加串口默认参数属性
+        self.baudrate = 115200
+        self.databits = 8
+        self.stopbits = 1
+        self.parity = 'None'
 
     def open_port(self, port_name: str, baudrate: int = 115200, timeout: int = 1) -> bool:
         """打开串口"""
@@ -83,8 +83,12 @@ class SerialController(QObject):
             self.serial_port = serial.Serial(
                 port=port_name,
                 baudrate=baudrate,
-                timeout=timeout
+                timeout=timeout,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS
             )
+
             self.serial_reader = SerialReader(self.serial_port)
             self.serial_reader.data_received.connect(self.data_received)
             self.serial_reader.start()
@@ -116,16 +120,55 @@ class SerialController(QObject):
             Logger.error(f"关闭串口失败: {str(e)}", module='serial')
             return False
 
-    def write_data(self, data: str):
-        """发送数据"""
+    def write_data(self, data: str, is_hex: bool = False) -> bool:
+        """发送数据
+
+        Args:
+            data: 要发送的数据（字符串或十六进制字符串）
+            is_hex: 是否为十六进制数据
+
+        Returns:
+            bool: 发送是否成功
+        """
         if self.serial_port and self.serial_port.is_open:
             try:
-                self.serial_port.write(data)
+                if is_hex:
+                    # 处理十六进制数据
+                    hex_str = data.replace(' ', '').replace('0x', '')
+                    data_bytes = bytes.fromhex(hex_str)
+                elif isinstance(data, str):
+                    # 处理普通字符串
+                    data_bytes = data.encode('utf-8')
+                else:
+                    data_bytes = data
+
+                print(f"发送数据: {data_bytes}")
+                self.serial_port.write(data_bytes)
+                self.serial_port.flush()
                 return True
             except Exception as e:
                 self.error_occurred.emit(str(e))
+                Logger.error(f"发送数据失败: {str(e)}", module='serial')
                 return False
+        Logger.warning("串口未打开，无法发送数据", module='serial')
         return False
+
+
+    def available(self) -> int:
+        """获取可读数据字节数
+
+        Returns:
+            int: 可读数据的字节数，未连接时返回0
+        """
+        if self.serial_port and self.serial_port.is_open:
+            return self.serial_port.in_waiting
+        return 0
+
+    def clear_buffers(self):
+        """清空接收和发送缓冲区"""
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.reset_input_buffer()
+            self.serial_port.reset_output_buffer()
 
     def is_connected(self) -> bool:
         """检查是否已连接"""

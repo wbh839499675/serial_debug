@@ -166,13 +166,25 @@ class ATCommandManager:
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # 将列表转换为元组
-            for model, command_sets in data.items():
-                for set_name, commands in command_sets.items():
-                    data[model][set_name] = [tuple(cmd) for cmd in commands]
+            # 提取基础命令集
+            basic_commands = data.get("基础命令集", [])
 
-            Logger.info(f"成功加载命令集配置: {self.config_file}", module='command_manager')
-            return data
+            # 为每个模组型号添加基础命令集
+            model_command_sets = {}
+            for model_name, commands in data.items():
+                if model_name != "基础命令集":
+                    # 将基础命令集添加到每个模组型号的命令集中
+                    model_command_sets[model_name] = {
+                        "基础命令集": basic_commands,
+                        **commands  # 合并其他命令集
+                    }
+
+            # 添加默认命令集（用于未定义的型号）
+            model_command_sets["默认"] = {
+                "基础命令集": basic_commands
+            }
+
+            return model_command_sets
         except FileNotFoundError:
             Logger.error(f"命令集配置文件不存在: {self.config_file}", module='command_manager')
             return {}
@@ -184,13 +196,5 @@ class ATCommandManager:
             return {}
 
     def get_command_sets(self, model_name: str) -> Dict[str, List[Tuple[str, str]]]:
-        """
-        获取指定模组型号的命令集
-
-        Args:
-            model_name: 模组型号名称
-
-        Returns:
-            命令集字典
-        """
-        return self.model_command_sets.get(model_name, {})
+        # 如果找不到指定型号的命令集，返回默认命令集
+        return self.model_command_sets.get(model_name, self.model_command_sets.get("默认", {}))
