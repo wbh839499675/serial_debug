@@ -1,8 +1,9 @@
 """
 功耗分析页面 - 主入口
 """
+import time
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, 
+    QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox,
     QTableWidget, QTableWidgetItem, QTabWidget
 )
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
@@ -10,21 +11,27 @@ from PyQt5.QtGui import QColor, QFont
 import numpy as np
 import pyqtgraph as pg
 from datetime import datetime
+import pandas as pd
+import usb.core
+import usb.util
+import serial.tools.list_ports
 
 # 导入新创建的模块
 from ui.power_analysis.ui_component import PowerAnalysisUIComponents
 from ui.power_analysis.data_processor import PowerDataProcessor
 from ui.power_analysis.report_generator import PowerReportGenerator
 from ui.power_analysis.config_manager import PowerConfigManager
+from core.mpa_controller import MpaController
+from utils.logger import Logger
 
 class PowerAnalysisPage(QWidget):
     """功耗分析页"""
-    
+
     # 定义信号
     test_started = pyqtSignal()
     test_finished = pyqtSignal()
     data_updated = pyqtSignal(dict)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
@@ -32,32 +39,29 @@ class PowerAnalysisPage(QWidget):
         self.at_manager = None
         self.test_running = False
         self.current_mode = "Idle"
-        
+
         # 初始化各模块
         self.ui_components = PowerAnalysisUIComponents(self)
         self.data_processor = PowerDataProcessor(self)
         self.report_generator = PowerReportGenerator(self)
         self.config_manager = PowerConfigManager(self)
-        
-        # 连接数据处理器信号
-        self.data_processor.data_updated.connect(self.on_data_updated)
-        self.data_processor.statistics_updated.connect(self.on_statistics_updated)
-        
+        self.mpa_controller = MpaController()
+
         # 初始化UI
         self.init_ui()
         self.init_connections()
         self.init_timers()
-    
+
     def init_ui(self):
         """初始化UI"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
-        
+
         # 创建工具栏
         toolbar = self.ui_components.create_toolbar()
         main_layout.addWidget(toolbar)
-        
+
         # 创建主选项卡
         self.main_tab = QTabWidget()
         self.main_tab.setStyleSheet("""
@@ -84,32 +88,32 @@ class PowerAnalysisPage(QWidget):
                 background: #e8e8e8;
             }
         """)
-        
+
         # 添加各个标签页
         self.device_config_tab = self.ui_components.create_device_config_tab()
         self.main_tab.addTab(self.device_config_tab, "设备配置")
-        
+
         self.test_plan_tab = self.ui_components.create_test_plan_tab()
         self.main_tab.addTab(self.test_plan_tab, "测试计划")
-        
+
         self.monitoring_tab = self.ui_components.create_monitoring_tab()
         self.main_tab.addTab(self.monitoring_tab, "实时监测")
-        
+
         self.analysis_tab = self.ui_components.create_analysis_tab()
         self.main_tab.addTab(self.analysis_tab, "数据分析")
-        
+
         self.data_management_tab = self.ui_components.create_data_management_tab()
         self.main_tab.addTab(self.data_management_tab, "数据管理")
-        
+
         self.tools_tab = self.ui_components.create_tools_tab()
         self.main_tab.addTab(self.tools_tab, "辅助工具")
-        
+
         main_layout.addWidget(self.main_tab)
-        
+
         # 底部：日志和进度条
         bottom_panel = self.ui_components.create_bottom_panel()
         main_layout.addWidget(bottom_panel)
-    
+
     def create_value_label(self, text, color):
         """创建数值标签"""
         label = QLabel(text)
@@ -124,7 +128,7 @@ class PowerAnalysisPage(QWidget):
             }}
         """)
         return label
-    
+
     def create_status_indicator(self, text, color):
         """创建状态指示器"""
         indicator = QLabel(text)
@@ -140,7 +144,7 @@ class PowerAnalysisPage(QWidget):
             }}
         """)
         return indicator
-    
+
     def init_connections(self):
         """初始化信号连接"""
         # 工具栏按钮
@@ -150,54 +154,57 @@ class PowerAnalysisPage(QWidget):
         self.load_config_btn.clicked.connect(self.load_config)
         self.export_btn.clicked.connect(self.export_data)
         self.report_btn.clicked.connect(self.generate_report)
-        
+
         # 设备连接与配置
         self.reset_btn.clicked.connect(self.reset_module)
         self.pin_code.textChanged.connect(self.check_pin_code)
-        
+
         # 工作模式控制
         self.mode_combo.currentTextChanged.connect(self.on_mode_changed)
         self.send_at_btn.clicked.connect(self.send_custom_at)
-        
+
         # 测试序列
         self.add_seq_btn.clicked.connect(self.add_test_step)
         self.remove_seq_btn.clicked.connect(self.remove_test_step)
         self.move_up_btn.clicked.connect(self.move_step_up)
         self.move_down_btn.clicked.connect(self.move_step_down)
-        
+
         # 图表控制
         self.pause_btn.clicked.connect(self.toggle_pause)
         self.clear_btn.clicked.connect(self.clear_data)
         self.screenshot_btn.clicked.connect(self.take_screenshot)
-        
+
         # 高级分析
         self.compare_file_btn.clicked.connect(self.load_compare_file)
         self.calc_stats_btn.clicked.connect(self.calculate_statistics)
-        
+
         # 辅助工具
         self.calc_btn.clicked.connect(self.calculate_power)
-        
+
         # 数据管理
         self.export_csv_btn.clicked.connect(self.export_csv)
         self.export_excel_btn.clicked.connect(self.export_excel)
         self.generate_report_btn.clicked.connect(self.generate_html_report)
         self.generate_pdf_btn.clicked.connect(self.generate_pdf_report)
         self.reset_config_btn.clicked.connect(self.reset_config)
-    
+
+        # 添加设置电压按钮连接
+        self.set_voltage_btn.clicked.connect(self.set_voltage)
+
     def init_timers(self):
         """初始化定时器"""
         # 数据更新定时器
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_data)
-        
+
         # 测试进度定时器
         self.progress_timer = QTimer()
         self.progress_timer.timeout.connect(self.update_progress)
-        
+
         # 统计计算定时器
         self.stats_timer = QTimer()
         self.stats_timer.timeout.connect(self.update_statistics)
-    
+
     def on_data_updated(self, data_point):
         """数据更新处理"""
         # 更新曲线
@@ -206,22 +213,36 @@ class PowerAnalysisPage(QWidget):
         currents = [d['current'] for d in test_data]
         voltages = [d['voltage'] for d in test_data]
         powers = [d['power'] for d in test_data]
-        
+
         self.current_curve.setData(times, currents)
         self.voltage_curve.setData(times, voltages)
         self.power_curve.setData(times, powers)
-        
+
         # 更新数值
         self.current_voltage_label.setText(f"{data_point['voltage']:.2f} V")
         self.current_current_label.setText(f"{data_point['current']:.2f} mA")
         self.current_power_label.setText(f"{data_point['power']:.2f} mW")
-        
+
         # 更新数据预览
         self.update_data_preview()
-        
+
         # 发送数据更新信号
         self.data_updated.emit(data_point)
-    
+
+    def set_voltage(self, voltage):
+        """设置功耗分析仪输出电压"""
+        print("开始设置输出电压...")
+        if not self.mpa_controller:
+            print("未初始化功耗分析仪控制器")
+            self.log_message("功耗分析仪控制器未初始化")
+            return
+
+        try:
+            print("开始设置输出电压")
+            self.mpa_controller.set_voltage(voltage)
+        except Exception as e:
+            self.log_message(f"设置电压失败")
+
     def on_statistics_updated(self, statistics):
         """统计信息更新处理"""
         # 更新显示
@@ -229,29 +250,51 @@ class PowerAnalysisPage(QWidget):
         self.max_current_label.setText(f"{statistics['max_current']:.2f} mA")
         self.min_current_label.setText(f"{statistics['min_current']:.2f} mA")
         self.total_power_label.setText(f"{statistics['total_power']:.4f} mAh")
-    
+
     def update_data(self):
         """更新数据"""
-        if not self.test_running:
+        if not self.mpa_controller or not self.mpa_controller.is_sampling:
             return
-        
-        # 模拟数据
-        import random
-        voltage = 3.8 + random.uniform(-0.1, 0.1)
-        current = 100 + random.uniform(-10, 10)
-        
-        # 添加数据点
-        self.data_processor.add_data_point(voltage, current, self.current_mode)
-    
+
+        try:
+            current_data = []
+            voltage_data = []
+            count = self.mpa_controller.get_data(current_data, voltage_data, 100)
+
+            if count > 0:
+                # 计算平均值
+                avg_current = sum(current_data) / len(current_data) if current_data else 0
+                avg_voltage = sum(voltage_data) / len(voltage_data) if voltage_data else 0
+                power = avg_current * avg_voltage
+
+                # 更新UI
+                self.current_value_label.setText(f"{avg_current:.2f} mA")
+                self.voltage_value_label.setText(f"{avg_voltage:.2f} V")
+                self.power_value_label.setText(f"{power:.2f} mW")
+
+                # 添加到测试数据
+                timestamp = time.time()
+                self.test_data.append({
+                    'timestamp': timestamp,
+                    'current': avg_current,
+                    'voltage': avg_voltage,
+                    'power': power
+                })
+
+                # 更新图表
+                self.update_charts(timestamp, avg_current, avg_voltage, power)
+        except Exception as e:
+            Logger.log(f"获取数据失败: {str(e)}", "ERROR")
+
     def update_data_preview(self):
         """更新数据预览"""
         test_data = self.data_processor.get_data()
         if not test_data:
             return
-        
+
         # 只显示最后20条数据
         recent_data = test_data[-20:]
-        
+
         # 更新表格
         self.data_preview_table.setRowCount(len(recent_data))
         for i, data in enumerate(recent_data):
@@ -260,16 +303,16 @@ class PowerAnalysisPage(QWidget):
             self.data_preview_table.setItem(i, 2, QTableWidgetItem(f"{data['current']:.2f}"))
             self.data_preview_table.setItem(i, 3, QTableWidgetItem(f"{data['power']:.2f}"))
             self.data_preview_table.setItem(i, 4, QTableWidgetItem(data['mode']))
-        
+
         # 更新数据点数和测试时长
         self.data_points_label.setText(str(len(test_data)))
         self.test_duration_label.setText(f"{len(test_data) * 0.1:.1f} s")
-    
+
     def update_progress(self):
         """更新进度"""
         if not self.test_running:
             return
-        
+
         # 模拟进度更新
         current = self.progress_bar.value()
         if current < 100:
@@ -683,7 +726,7 @@ class PowerAnalysisPage(QWidget):
             if mode not in mode_stats:
                 mode_stats[mode] = []
             mode_stats[mode].append(data['current'])
-        
+
         # 计算各模式的统计信息
         stats_text = "各模式统计信息:\n"
         for mode, currents in mode_stats.items():
@@ -691,26 +734,26 @@ class PowerAnalysisPage(QWidget):
             max_current = np.max(currents)
             min_current = np.min(currents)
             total_power = np.sum([c * 3.8 for c in currents]) * 0.1 / 3600  # mWh to mAh
-            
+
             stats_text += f"\n模式: {mode}\n"
             stats_text += f"  平均电流: {avg_current:.2f} mA\n"
             stats_text += f"  峰值电流: {max_current:.2f} mA\n"
             stats_text += f"  最小电流: {min_current:.2f} mA\n"
             stats_text += f"  累计功耗: {total_power:.4f} mAh\n"
-        
+
         # 显示统计信息
         self.analysis_result.setText(stats_text)
         self.log_message("统计信息已计算")
-    
+
     def calculate_power(self):
         """计算功耗"""
         voltage = self.calc_voltage.value()
         current = self.calc_current.value()
         time = self.calc_time.value()
-        
+
         power = voltage * current * time  # mAh
         self.calc_result.setText(f"{power:.2f} mAh")
-    
+
     def reset_config(self):
         """恢复默认配置"""
         # 重置串口配置
@@ -718,11 +761,11 @@ class PowerAnalysisPage(QWidget):
         self.databits_combo.setCurrentText("8")
         self.stopbits_combo.setCurrentText("1")
         self.parity_combo.setCurrentText("无")
-        
+
         # 重置电源配置
         self.power_type_combo.setCurrentText("手动模式")
         self.power_address.setText("")
-        
+
         # 重置模式配置
         self.mode_combo.setCurrentText("待机(Idle)")
         self.phone_number.setText("")
@@ -733,31 +776,31 @@ class PowerAnalysisPage(QWidget):
         self.packet_size.setValue(1024)
         self.send_interval.setValue(1000)
         self.wake_period.setValue(60)
-        
+
         # 重置测试计划
         self.single_test_radio.setChecked(False)
         self.loop_test_radio.setChecked(False)
         self.loop_count.setValue(1)
         self.infinite_loop_radio.setChecked(False)
-        
+
         # 清空测试序列
         self.test_sequence_table.setRowCount(0)
-        
+
         # 重置触发条件
         self.trigger_threshold.setValue(100)
         self.auto_capture_check.setChecked(False)
-        
+
         self.log_message("配置已恢复为默认值")
-    
+
     def log_message(self, message):
         """记录日志消息"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_output.append(f"[{timestamp}] {message}")
+        #self.log_output.append(f"[{timestamp}] {message}")
 
     def reset_module(self):
         """复位模块"""
         self.log_message("正在复位模块...")
-        
+
         # 这里应该实现实际的复位逻辑
         # 例如通过AT命令复位模块
         if self.serial_controller and self.serial_controller.is_connected:
@@ -793,17 +836,17 @@ class PowerAnalysisPage(QWidget):
         self.sampling_interval = self.interval_spin.value()
         if hasattr(self, 'update_timer'):
             self.update_timer.setInterval(self.sampling_interval)
-    
+
     def toggle_connection(self):
         """切换连接状态"""
         if self.connect_btn.text() == "连接设备":
             # 连接设备
             port = self.port_combo.currentText()
             baudrate = int(self.baudrate_combo.currentText())
-            
+
             # 这里应该实现实际的连接逻辑
             self.log_message(f"正在连接设备 {port}，波特率 {baudrate}...")
-            
+
             # 模拟连接成功
             self.connect_btn.setText("断开设备")
             self.connect_btn.setStyleSheet("""
@@ -822,7 +865,7 @@ class PowerAnalysisPage(QWidget):
                 }
             """)
             self.log_message("设备连接成功")
-            
+
             # 更新状态指示
             self.connect_status.setText("已连接")
             self.connect_status.setStyleSheet("""
@@ -839,7 +882,7 @@ class PowerAnalysisPage(QWidget):
         else:
             # 断开设备
             self.log_message("正在断开设备...")
-            
+
             # 模拟断开成功
             self.connect_btn.setText("连接设备")
             self.connect_btn.setStyleSheet("""
@@ -858,7 +901,7 @@ class PowerAnalysisPage(QWidget):
                 }
             """)
             self.log_message("设备已断开")
-            
+
             # 更新状态指示
             self.connect_status.setText("未连接")
             self.connect_status.setStyleSheet("""
@@ -872,7 +915,7 @@ class PowerAnalysisPage(QWidget):
                     border: 1px solid #f56c6c;
                 }
             """)
-    
+
     def toggle_test(self):
         """切换测试状态"""
         if self.start_test_btn.text() == "开始测试":

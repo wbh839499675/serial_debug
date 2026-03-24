@@ -13,12 +13,14 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 import pyqtgraph as pg
 
+from utils.constants import get_page_button_style
+
 class PowerAnalysisUIComponents:
     """功耗分析页面UI组件"""
-    
+
     def __init__(self, parent_page):
         self.parent_page = parent_page
-    
+
     def create_toolbar(self):
         """创建工具栏"""
         toolbar = QFrame()
@@ -31,7 +33,7 @@ class PowerAnalysisUIComponents:
         """)
         layout = QHBoxLayout(toolbar)
         layout.setContentsMargins(10, 5, 10, 5)
-        
+
         # 连接/断开按钮
         self.parent_page.connect_btn = QPushButton("连接设备")
         self.parent_page.connect_btn.setStyleSheet("""
@@ -50,7 +52,7 @@ class PowerAnalysisUIComponents:
             }
         """)
         layout.addWidget(self.parent_page.connect_btn)
-        
+
         # 开始/停止测试按钮
         self.parent_page.start_test_btn = QPushButton("开始测试")
         self.parent_page.start_test_btn.setStyleSheet("""
@@ -69,7 +71,7 @@ class PowerAnalysisUIComponents:
             }
         """)
         layout.addWidget(self.parent_page.start_test_btn)
-        
+
         # 保存配置按钮
         self.parent_page.save_config_btn = QPushButton("保存配置")
         self.parent_page.save_config_btn.setStyleSheet("""
@@ -88,12 +90,12 @@ class PowerAnalysisUIComponents:
             }
         """)
         layout.addWidget(self.parent_page.save_config_btn)
-        
+
         # 加载配置按钮
         self.parent_page.load_config_btn = QPushButton("加载配置")
         self.parent_page.load_config_btn.setStyleSheet(self.parent_page.save_config_btn.styleSheet())
         layout.addWidget(self.parent_page.load_config_btn)
-        
+
         # 导出数据按钮
         self.parent_page.export_btn = QPushButton("导出数据")
         self.parent_page.export_btn.setStyleSheet("""
@@ -112,7 +114,7 @@ class PowerAnalysisUIComponents:
             }
         """)
         layout.addWidget(self.parent_page.export_btn)
-        
+
         # 生成报告按钮
         self.parent_page.report_btn = QPushButton("生成报告")
         self.parent_page.report_btn.setStyleSheet("""
@@ -131,28 +133,90 @@ class PowerAnalysisUIComponents:
             }
         """)
         layout.addWidget(self.parent_page.report_btn)
-        
+
         layout.addStretch()
-        
+
         return toolbar
-    
+
     def create_device_config_tab(self):
         """创建设备配置标签页"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
-        
+
         # 创建滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        
+
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(15)
-        
+
+        # 功耗分析仪状态组
+        analyzer_group = QGroupBox("功耗分析仪状态")
+        analyzer_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dcdfe6;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
+        analyzer_layout = QGridLayout()
+
+        analyzer_layout.addWidget(QLabel("设备状态:"))
+        self.parent_page.device_status_label = QLabel("未连接")
+        self.parent_page.device_status_label.setStyleSheet("""
+            QLabel {
+                color: #f56c6c;
+                font-weight: bold;
+                padding: 5px;
+                background-color: #fef0f0;
+                border-radius: 3px;
+            }
+        """)
+        analyzer_layout.addWidget(self.parent_page.device_status_label, 0, 1)
+
+        # 添加电压控制
+        analyzer_layout.addWidget(QLabel("输出电压(V):"), 1, 0)
+        self.parent_page.voltage_spin = QDoubleSpinBox()
+        self.parent_page.voltage_spin.setRange(0, 5)  # 设置电压范围0-5V
+        self.parent_page.voltage_spin.setValue(3.3)   # 默认值3.3V
+        self.parent_page.voltage_spin.setSingleStep(0.1)  # 步进0.1V
+        analyzer_layout.addWidget(self.parent_page.voltage_spin, 1, 1)
+
+        # 添加设置电压按钮
+        self.parent_page.set_voltage_btn = QPushButton("设置电压")
+        self.parent_page.set_voltage_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #409eff;
+                color: white;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #66b1ff;
+            }
+            QPushButton:disabled {
+                background-color: #c0c4cc;
+                color: #ffffff;
+            }
+        """)
+        analyzer_layout.addWidget(self.parent_page.set_voltage_btn, 1, 2)
+
+        analyzer_group.setLayout(analyzer_layout)
+        scroll_layout.addWidget(analyzer_group)
+
         # 串口设置组
         serial_group = QGroupBox("串口设置")
         serial_group.setStyleSheet("""
@@ -170,81 +234,64 @@ class PowerAnalysisUIComponents:
             }
         """)
         serial_layout = QGridLayout()
-        
+
         # 串口设置控件
         serial_layout.addWidget(QLabel("COM口:"), 0, 0)
         self.parent_page.port_combo = QComboBox()
         serial_layout.addWidget(self.parent_page.port_combo, 0, 1)
-        
+
         serial_layout.addWidget(QLabel("波特率:"), 0, 2)
         self.parent_page.baudrate_combo = QComboBox()
         self.parent_page.baudrate_combo.addItems(["4800", "9600", "19200", "38400", "57600", "115200"])
         self.parent_page.baudrate_combo.setCurrentText("115200")
         serial_layout.addWidget(self.parent_page.baudrate_combo, 0, 3)
-        
+
         serial_layout.addWidget(QLabel("数据位:"), 1, 0)
         self.parent_page.databits_combo = QComboBox()
         self.parent_page.databits_combo.addItems(["5", "6", "7", "8"])
         self.parent_page.databits_combo.setCurrentText("8")
         serial_layout.addWidget(self.parent_page.databits_combo, 1, 1)
-        
+
         serial_layout.addWidget(QLabel("停止位:"), 1, 2)
         self.parent_page.stopbits_combo = QComboBox()
         self.parent_page.stopbits_combo.addItems(["1", "1.5", "2"])
         self.parent_page.stopbits_combo.setCurrentText("1")
         serial_layout.addWidget(self.parent_page.stopbits_combo, 1, 3)
-        
+
         serial_layout.addWidget(QLabel("校验位:"), 2, 0)
         self.parent_page.parity_combo = QComboBox()
         self.parent_page.parity_combo.addItems(["无", "奇校验", "偶校验"])
         self.parent_page.parity_combo.setCurrentText("无")
         serial_layout.addWidget(self.parent_page.parity_combo, 2, 1)
-        
+
         serial_group.setLayout(serial_layout)
         scroll_layout.addWidget(serial_group)
-        
-        # 电源控制接口组
-        power_group = QGroupBox("电源控制接口")
-        power_group.setStyleSheet(serial_group.styleSheet())
-        power_layout = QGridLayout()
-        
-        power_layout.addWidget(QLabel("电源类型:"), 0, 0)
-        self.parent_page.power_type_combo = QComboBox()
-        self.parent_page.power_type_combo.addItems(["手动模式", "DP832", "IT6720"])
-        power_layout.addWidget(self.parent_page.power_type_combo, 0, 1)
-        
-        power_layout.addWidget(QLabel("电源地址:"), 0, 2)
-        self.parent_page.power_address = QLineEdit()
-        self.parent_page.power_address.setPlaceholderText("USB/串口地址")
-        power_layout.addWidget(self.parent_page.power_address, 0, 3)
-        
-        power_group.setLayout(power_layout)
-        scroll_layout.addWidget(power_group)
-        
+
+
         # SIM卡检测组
         sim_group = QGroupBox("SIM卡检测")
-        sim_group.setStyleSheet(serial_group.styleSheet())
+        sim_group.setStyleSheet(analyzer_group.styleSheet())
         sim_layout = QGridLayout()
-        
+
         sim_layout.addWidget(QLabel("SIM卡状态:"), 0, 0)
         self.parent_page.sim_status_label = QLabel("未检测")
         self.parent_page.sim_status_label.setStyleSheet("color: #f56c6c; font-weight: bold;")
         sim_layout.addWidget(self.parent_page.sim_status_label, 0, 1)
-        
+
         sim_layout.addWidget(QLabel("PIN码:"), 0, 2)
         self.parent_page.pin_code = QLineEdit()
         self.parent_page.pin_code.setPlaceholderText("输入PIN码")
         self.parent_page.pin_code.setEchoMode(QLineEdit.Password)
         sim_layout.addWidget(self.parent_page.pin_code, 0, 3)
-        
+
         sim_group.setLayout(sim_layout)
         scroll_layout.addWidget(sim_group)
-        
+
         # 复位控制组
         reset_group = QGroupBox("复位控制")
-        reset_group.setStyleSheet(serial_group.styleSheet())
+        reset_group.setStyleSheet(analyzer_group.styleSheet())
         reset_layout = QVBoxLayout()
-        
+
         self.parent_page.reset_btn = QPushButton("复位模块")
         self.parent_page.reset_btn.setStyleSheet("""
             QPushButton {
@@ -268,7 +315,7 @@ class PowerAnalysisUIComponents:
         layout.addWidget(scroll)
         
         return tab
-    
+
     def create_test_plan_tab(self):
         """创建测试计划标签页"""
         tab = QWidget()

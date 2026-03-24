@@ -1,0 +1,6 @@
+﻿  model_test.cpp
+F:\CAT1 ProTest Suite\mpa_api\src\model_test.cpp(26,17): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+F:\CAT1 ProTest Suite\mpa_api\src\model_test.cpp(27,17): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+F:\CAT1 ProTest Suite\mpa_api\src\model_test.cpp(61,30): warning C4305: “参数”: 从“double”到“float”截断
+F:\CAT1 ProTest Suite\mpa_api\src\model_test.cpp(76,25): warning C4244: “初始化”: 从“int64_t”转换到“int”，可能丢失数据
+  api.vcxproj -> F:\CAT1 ProTest Suite\mpa_api\x64\Debug\api.exe

@@ -30,6 +30,7 @@ from PyQt5.QtGui import QFont, QColor, QBrush, QIcon, QTextCursor
 from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
 from core.relay_controller import RelayController, RelayMonitorThread
+from core.power_analyzer_controller import PowerAnalyzerController, PowerAnalyzerMonitorThread
 from core.device_monitor import DeviceMonitor
 from core.tester import SerialTester
 
@@ -50,11 +51,11 @@ from utils.constants import UI_NAV_ITEM_WIDTH
 from utils.version import Version
 
 # ====== 导航页面宏开关配置 ======
-ENABLE_SERIAL_DEBUG_PAGE    = False      # 启用串口调试页面
+ENABLE_SERIAL_DEBUG_PAGE    = True      # 启用串口调试页面
 ENABLE_CAMERA_PAGE          = True      # 启用Camera调试页面
 ENABLE_GNSS_PAGE            = False      # 启用GNSS测试页面
 ENABLE_DEVICE_TEST_PAGE     = False      # 启用设备测试页面
-ENABLE_POWER_ANALYSIS_PAGE  = False      # 启用功耗分析页面
+ENABLE_POWER_ANALYSIS_PAGE  = True      # 启用功耗分析页面
 ENABLE_OSCILLOSCOPE_PAGE    = False      # 启用虚拟示波器页面
 ENABLE_FEEDBACK_PAGE        = True      # 启用反馈页面
 
@@ -118,6 +119,7 @@ class MainWindow(QMainWindow):
         self.nav_buttons_list = []
         self.nav_buttons_dict = {}
         self.relay_controller = RelayController()
+        self.power_analyzer_controller = PowerAnalyzerController()
         self.test_thread = None
         self.device_monitor = None
         self.test_data = None
@@ -137,12 +139,6 @@ class MainWindow(QMainWindow):
         self.relay_monitor_thread = None
         self.relay_device_id = "HID\\VID_5131&PID_2007"
 
-        # 启动继电器监控线程
-        self.start_relay_monitor()
-
-        # 连接继电器状态变化信号
-        self.relay_controller.status_changed.connect(self.on_power_status_changed)
-
         # 设置定时器
         self.status_timer = QTimer()
         self.status_timer.timeout.connect(self.update_status)
@@ -151,9 +147,6 @@ class MainWindow(QMainWindow):
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_test_stats)
         self.update_timer.start(500)
-
-        #self.log_auto_scroll = QCheckBox("自动滚动")
-        #self.log_auto_scroll.setChecked(True)
 
         # 确保日志控件已创建
         self.log_text = QTextEdit()
@@ -168,6 +161,12 @@ class MainWindow(QMainWindow):
 
         # 创建状态栏
         self.create_status_bar()
+
+        # 启动继电器监控线程
+        self.start_relay_monitor()
+
+        # 连接继电器状态变化信号
+        self.relay_controller.status_changed.connect(self.on_power_status_changed)
 
         # 初始化按钮状态
         if hasattr(self, 'relay_on_btn') and hasattr(self, 'relay_off_btn'):
@@ -346,6 +345,7 @@ class MainWindow(QMainWindow):
         # 状态栏标签
         self.power_status_label = QLabel("🔋 设备电源: --")
         self.relay_status_label = QLabel("⚡ 继电器: 未连接")
+        self.power_analyzer_label = QLabel("📉 功耗分析仪: 未连接")
         self.memory_status_label = QLabel("💾 内存: --")
         self.cpu_status_label = QLabel("⚡ CPU: --")
         self.time_status_label = QLabel("🕐 时间: --")
@@ -358,6 +358,8 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.power_status_label)
         self.status_bar.addPermanentWidget(separator)
         self.status_bar.addPermanentWidget(self.relay_status_label)
+        self.status_bar.addPermanentWidget(separator)
+        self.status_bar.addPermanentWidget(self.power_analyzer_label)
         self.status_bar.addPermanentWidget(separator)
         self.status_bar.addPermanentWidget(self.memory_status_label)
         self.status_bar.addPermanentWidget(separator)
@@ -465,6 +467,21 @@ class MainWindow(QMainWindow):
             self.relay_status_label.setStyleSheet("color: #f56c6c; font-size: 9pt;")
             Logger.log("继电器已断开", "WARNING", self.log_text)
             Logger.log("继电器已断开", "WARNING")
+
+    def on_power_status_changed(self, status):
+        """处理设备电源状态变化
+
+        Args:
+            status: 电源状态 ("POWER_ON" 或 "POWER_OFF")
+        """
+        if status == "POWER_ON":
+            self.power_status_label.setText("🔋 设备电源: 通电")
+            self.power_status_label.setStyleSheet("color: #67c23a; font-size: 9pt;")
+            Logger.log("设备电源状态: 通电", "INFO", self.log_text)
+        else:
+            self.power_status_label.setText("🔋 设备电源: 断电")
+            self.power_status_label.setStyleSheet("color: #909399; font-size: 9pt;")
+            Logger.log("设备电源状态: 断电", "INFO", self.log_text)
 
     def on_power_status_changed(self, status):
         """处理设备电源状态变化
@@ -1319,6 +1336,13 @@ class MainWindow(QMainWindow):
                 self.status_timer.stop()
             if hasattr(self, 'update_timer') and self.update_timer.isActive():
                 self.update_timer.stop()
+
+            # 2. 停止功耗分析仪监控线程
+            if hasattr(self, 'power_analyzer_monitor_thread') and self.power_analyzer_monitor_thread:
+                try:
+                    self.stop_power_analyzer_monitor()
+                except Exception as e:
+                    Logger.log(f"停止功耗分析仪监控线程失败: {str(e)}", "ERROR", self.log_text)
 
             # 2. 先停止设备监控线程（测试线程依赖它）
             if self.device_monitor and self.device_monitor.isRunning():
