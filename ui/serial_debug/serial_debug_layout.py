@@ -216,7 +216,7 @@ class SerialDebugTabLayout:
         auto_scroll_check.setChecked(True)
 
         timestamp_recv_check = QCheckBox("显示时间戳")
-        timestamp_recv_check.setChecked(False)
+        timestamp_recv_check.setChecked(True)
 
         pause_recv_check = QCheckBox("暂停接收")
         pause_recv_check.setChecked(False)
@@ -317,14 +317,7 @@ class SerialDebugTabLayout:
                                padding='5px; background-color: #f8f9fa; border-radius: 4px;')
         )
 
-        recv_rate_label = QLabel("接收速率: 0 B/s")
-        recv_rate_label.setFixedWidth(150)
-        recv_rate_label.setStyleSheet(
-            get_page_label_style('serial_debug', 'stats',
-                               padding='5px; background-color: #f8f9fa; border-radius: 4px;')
-        )
-
-        return sent_count_label, recv_count_label, recv_rate_label
+        return sent_count_label, recv_count_label
 
     @staticmethod
     def create_send_group():

@@ -270,7 +270,7 @@ class SerialDebugTab(QWidget):
             QPlainTextEdit {
                 background-color: #000000;
                 color: #00FF00;
-                font-family: Consolas, 'Courier New', monospace;
+                font-family: 'SimSun', '宋体', serif;
                 font-size: 10pt;
             }
         """)
@@ -292,14 +292,12 @@ class SerialDebugTab(QWidget):
         stats_layout = QHBoxLayout(stats_widget)
         stats_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.sent_count_label, self.recv_count_label, self.recv_rate_label = \
+        self.sent_count_label, self.recv_count_label = \
             SerialDebugTabLayout.create_stats_labels()
 
         stats_layout.addWidget(self.sent_count_label)
         stats_layout.addWidget(self.recv_count_label)
         stats_layout.addStretch()
-        stats_layout.addWidget(self.recv_rate_label)
-
         recv_layout.addWidget(stats_widget)
 
         return recv_group

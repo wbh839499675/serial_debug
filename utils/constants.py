@@ -1908,7 +1908,7 @@ TEXT_EDIT_STYLES = {
         'padding': '8px',
         'background-color': '#fafafa',
         'color': '#606266',
-        'font-family': 'Consolas, monospace',
+        'font-family': 'SimSun, "宋体", serif',
         'font-size': '10pt'
     },
     'dark': {
@@ -1917,7 +1917,7 @@ TEXT_EDIT_STYLES = {
         'padding': '8px',
         'background-color': '#1e1e1e',
         'color': '#d4d4d4',
-        'font-family': 'Consolas, monospace',
+        'font-family': 'SimSun, "宋体", serif',
         'font-size': '10pt'
     },
     'preview': {
@@ -1926,7 +1926,7 @@ TEXT_EDIT_STYLES = {
         'padding': '10px',
         'background-color': '#f5f7fa',
         'color': '#606266',
-        'font-family': 'Consolas, monospace',
+        'font-family': 'SimSun, "宋体", serif',
         'font-size': '9pt'
     }
 }

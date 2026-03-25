@@ -71,7 +71,6 @@ class SerialDebugTabEvents:
     def on_hex_display_changed(self, state):
         """十六进制显示改变"""
         self.tab.data_receiver.hex_display = (state == Qt.Checked)
-        self.tab.data_receiver.update_receive_display()
 
     def on_auto_scroll_changed(self, state):
         """自动滚动改变"""
@@ -81,7 +80,6 @@ class SerialDebugTabEvents:
         """时间戳显示改变"""
         self.tab.data_receiver.show_timestamp = (state == Qt.Checked)
         self.tab.data_sender.show_timestamp = (state == Qt.Checked)
-        self.tab.data_receiver.update_receive_display()
 
     def on_pause_recv_changed(self, state):
         """暂停接收改变"""

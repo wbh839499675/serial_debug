@@ -69,7 +69,7 @@ class DataSender(QObject):
         self.hex_send = False
         self.add_crlf = False
         self.total_send_bytes = 0
-        self.show_timestamp = False
+        self.show_timestamp = True
 
         # 定时发送相关
         self.is_timer_sending = False
@@ -168,7 +168,7 @@ class DataSender(QObject):
 
             if success:
                 # 记录发送日志
-                print(f"数据发送成功。。。。。。{send_bytes}")
+                print(f"数据发送成功{send_bytes}")
                 display_data = send_bytes.decode('utf-8', errors='ignore')
                 if self.hex_send:
                     display_data = send_bytes.hex(' ').upper()
