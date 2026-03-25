@@ -186,13 +186,33 @@ class PowerAnalysisUIComponents:
         """)
         analyzer_layout.addWidget(self.parent_page.device_status_label, 0, 1)
 
+        # 新增：搜索设备按钮
+        self.parent_page.search_device_btn = QPushButton("搜索设备")
+        self.parent_page.search_device_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #67c23a;
+                color: white;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #85ce61;
+            }
+            QPushButton:disabled {
+                background-color: #c0c4cc;
+                color: #ffffff;
+            }
+        """)
+        analyzer_layout.addWidget(self.parent_page.search_device_btn, 0, 2)
+
         # 添加电压控制
-        analyzer_layout.addWidget(QLabel("输出电压(V):"), 1, 0)
+        analyzer_layout.addWidget(QLabel("输出电压(V):"), 0, 3)
         self.parent_page.voltage_spin = QDoubleSpinBox()
-        self.parent_page.voltage_spin.setRange(0, 5)  # 设置电压范围0-5V
-        self.parent_page.voltage_spin.setValue(3.3)   # 默认值3.3V
+        self.parent_page.voltage_spin.setRange(0, 4.2)  # 设置电压范围0-4.2V
+        self.parent_page.voltage_spin.setValue(3.6)   # 默认值3.6V
         self.parent_page.voltage_spin.setSingleStep(0.1)  # 步进0.1V
-        analyzer_layout.addWidget(self.parent_page.voltage_spin, 1, 1)
+        analyzer_layout.addWidget(self.parent_page.voltage_spin, 0, 4)
 
         # 添加设置电压按钮
         self.parent_page.set_voltage_btn = QPushButton("设置电压")
@@ -212,7 +232,27 @@ class PowerAnalysisUIComponents:
                 color: #ffffff;
             }
         """)
-        analyzer_layout.addWidget(self.parent_page.set_voltage_btn, 1, 2)
+        analyzer_layout.addWidget(self.parent_page.set_voltage_btn, 0, 5)
+
+        # 新增：开始/暂停输出按钮
+        self.parent_page.capture_btn = QPushButton("开始采集")
+        self.parent_page.capture_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e6a23c;
+                color: white;
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ebb563;
+            }
+            QPushButton:disabled {
+                background-color: #c0c4cc;
+                color: #ffffff;
+            }
+        """)
+        analyzer_layout.addWidget(self.parent_page.capture_btn, 0, 6)
 
         analyzer_group.setLayout(analyzer_layout)
         scroll_layout.addWidget(analyzer_group)

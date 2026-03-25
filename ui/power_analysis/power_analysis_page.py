@@ -4,7 +4,7 @@
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox,
-    QTableWidget, QTableWidgetItem, QTabWidget
+    QTableWidget, QTableWidgetItem, QTabWidget, QMessageBox, QFileDialog, QApplication
 )
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
@@ -31,6 +31,7 @@ class PowerAnalysisPage(QWidget):
     test_started = pyqtSignal()
     test_finished = pyqtSignal()
     data_updated = pyqtSignal(dict)
+    data_received = pyqtSignal(float, float, float)  # 电压, 电流, 功率
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -46,6 +47,17 @@ class PowerAnalysisPage(QWidget):
         self.report_generator = PowerReportGenerator(self)
         self.config_manager = PowerConfigManager(self)
         self.mpa_controller = MpaController()
+
+        # 数据采集
+        self.is_collecting = False
+        self.data_received.connect(self.update_ui_from_callback)
+
+        # 数据存储
+        self.time_data = []  # 时间数据
+        self.voltage_data = []  # 电压数据
+        self.current_data = []  # 电流数据
+        self.power_data = []  # 功率数据
+        self.start_time = 0  # 采集开始时间
 
         # 初始化UI
         self.init_ui()
@@ -187,15 +199,15 @@ class PowerAnalysisPage(QWidget):
         self.generate_report_btn.clicked.connect(self.generate_html_report)
         self.generate_pdf_btn.clicked.connect(self.generate_pdf_report)
         self.reset_config_btn.clicked.connect(self.reset_config)
+        self.capture_btn.clicked.connect(self.toggle_collection)
 
+        # 添加功耗分析仪设备按钮连接
+        self.search_device_btn.clicked.connect(self.search_power_analyzer)
         # 添加设置电压按钮连接
         self.set_voltage_btn.clicked.connect(self.set_voltage)
 
     def init_timers(self):
         """初始化定时器"""
-        # 数据更新定时器
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.update_data)
 
         # 测试进度定时器
         self.progress_timer = QTimer()
@@ -229,19 +241,157 @@ class PowerAnalysisPage(QWidget):
         # 发送数据更新信号
         self.data_updated.emit(data_point)
 
-    def set_voltage(self, voltage):
+    # 在PowerAnalysisPage类中添加搜索设备按钮的点击事件处理
+    def search_power_analyzer(self):
+        """搜索功耗分析仪设备"""
+        try:
+            # 显示搜索提示
+            self.device_status_label.setText("搜索中...")
+            self.device_status_label.setStyleSheet("""
+                QLabel {
+                    color: #e6a23c;
+                    font-weight: bold;
+                    padding: 5px;
+                    background-color: #fdf6ec;
+                    border-radius: 3px;
+                }
+            """)
+            QApplication.processEvents()  # 强制更新UI
+
+            # 调用控制器搜索设备
+            device_count = self.mpa_controller.search_devices()
+
+            # 获取设备信息
+            device_info = self.mpa_controller.get_device_info()
+
+            if device_count > 0:
+                # 更新UI显示设备已找到
+                self.device_status_label.setText(f"已找到设备 (共{device_count}个)")
+                self.device_status_label.setStyleSheet("""
+                    QLabel {
+                        color: #67c23a;
+                        font-weight: bold;
+                        padding: 5px;
+                        background-color: #f0f9ff;
+                        border-radius: 3px;
+                    }
+                """)
+
+                # 启用采集按钮
+                self.capture_btn.setEnabled(True)
+
+                # 记录日志
+                self.log_message(f"成功找到 {device_count} 个功耗分析仪设备")
+
+                # 显示设备信息
+                QMessageBox.information(self, "搜索结果", f"已找到 {device_count} 个功耗分析仪设备")
+            else:
+                # 更新UI显示未找到设备
+                self.device_status_label.setText("未找到设备")
+                self.device_status_label.setStyleSheet("""
+                    QLabel {
+                        color: #f56c6c;
+                        font-weight: bold;
+                        padding: 5px;
+                        background-color: #fef0f0;
+                        border-radius: 3px;
+                    }
+                """)
+
+                # 记录日志
+                self.log_message("未找到功耗分析仪设备")
+
+                # 显示警告
+                QMessageBox.warning(self, "搜索结果", "未找到功耗分析仪设备")
+
+        except Exception as e:
+            # 更新UI显示搜索失败
+            self.device_status_label.setText("搜索失败")
+            self.device_status_label.setStyleSheet("""
+                QLabel {
+                    color: #f56c6c;
+                    font-weight: bold;
+                    padding: 5px;
+                    background-color: #fef0f0;
+                    border-radius: 3px;
+                }
+            """)
+
+            # 记录错误日志
+            self.log_message(f"搜索功耗分析仪设备失败: {str(e)}")
+
+            # 显示错误信息
+            QMessageBox.critical(self, "错误", f"搜索设备失败: {str(e)}")
+
+    def set_voltage(self):
         """设置功耗分析仪输出电压"""
-        print("开始设置输出电压...")
+        # 从voltage_spin控件获取电压值
+        voltage = self.voltage_spin.value()
+
         if not self.mpa_controller:
             print("未初始化功耗分析仪控制器")
             self.log_message("功耗分析仪控制器未初始化")
             return
 
         try:
-            print("开始设置输出电压")
             self.mpa_controller.set_voltage(voltage)
+            self.log_message(f"电压已设置为 {voltage}V")
         except Exception as e:
-            self.log_message(f"设置电压失败")
+            self.log_message(f"设置电压失败: {str(e)}")
+
+    def start_collection(self):
+        """开始采集数据"""
+        if not self.is_collecting:
+            self.is_collecting = True
+            self.capture_btn.setText("停止采集")
+            self.start_time = time.time()
+
+            # 清空之前的数据
+            self.time_data = []
+            self.voltage_data = []
+            self.current_data = []
+            self.power_data = []
+
+            # 注册回调函数，传入设备句柄作为用户数据
+            if not self.mpa_controller.set_callback(
+                self.on_data_callback,
+                self.mpa_controller.current_device
+            ):
+                self.log_output.append("注册数据回调失败")
+                self.is_collecting = False
+                self.capture_btn.setText("开始采集")
+                return
+
+            # 开始功耗分析仪采样
+            try:
+                voltage = self.voltage_spin.value()
+                self.mpa_controller.start(voltage)
+            except Exception as e:
+                self.log_output.append(f"开始采样失败: {str(e)}")
+
+            self.log_output.append("开始采集数据...")
+
+    def stop_collection(self):
+        """停止采集数据"""
+        if self.is_collecting:
+            self.is_collecting = False
+            self.capture_btn.setText("开始采集")
+
+            # 停止功耗分析仪采样
+            try:
+                self.mpa_controller.stop()
+            except Exception as e:
+                self.log_output.append(f"停止采样失败: {str(e)}")
+
+            self.log_output.append("停止采集数据")
+
+    def toggle_collection(self):
+        """切换采集状态"""
+        if self.is_collecting:
+            self.stop_collection()
+        else:
+            self.start_collection()
+
 
     def on_statistics_updated(self, statistics):
         """统计信息更新处理"""
@@ -251,40 +401,79 @@ class PowerAnalysisPage(QWidget):
         self.min_current_label.setText(f"{statistics['min_current']:.2f} mA")
         self.total_power_label.setText(f"{statistics['total_power']:.4f} mAh")
 
-    def update_data(self):
-        """更新数据"""
-        if not self.mpa_controller or not self.mpa_controller.is_sampling:
+    def on_data_callback(self, device_handle, voltage, current, user_data):
+        """
+        数据回调处理函数 - 只负责接收数据和发送信号
+        """
+        if not self.is_collecting:
             return
 
+        #print(f"电压: {voltage:.2f} V, 电流: {current:.6f} mA")
+
+        # 计算功率
+        power = voltage * current
+
+        # 计算时间戳
+        elapsed_time = time.time() - self.start_time
+
+        # 添加数据到列表
+        self.time_data.append(elapsed_time)
+        self.voltage_data.append(voltage)
+        self.current_data.append(current)
+        self.power_data.append(power)
+
+        # 发送信号，在主线程中更新UI
+        self.data_received.emit(voltage, current, power)
+
+    def update_ui_from_callback(self, voltage, current, power):
+        """
+        在主线程中更新UI
+        """
+        # 检查对象是否存在
         try:
-            current_data = []
-            voltage_data = []
-            count = self.mpa_controller.get_data(current_data, voltage_data, 100)
+            if not hasattr(self, 'current_voltage_label') or self.current_voltage_label is None:
+                return
+        except RuntimeError:
+            return
 
-            if count > 0:
-                # 计算平均值
-                avg_current = sum(current_data) / len(current_data) if current_data else 0
-                avg_voltage = sum(voltage_data) / len(voltage_data) if voltage_data else 0
-                power = avg_current * avg_voltage
+        # 更新曲线
+        try:
+            self.current_curve.setData(self.time_data, self.current_data)
+            self.voltage_curve.setData(self.time_data, self.voltage_data)
+            self.power_curve.setData(self.time_data, self.power_data)
+        except RuntimeError:
+            return
 
-                # 更新UI
-                self.current_value_label.setText(f"{avg_current:.2f} mA")
-                self.voltage_value_label.setText(f"{avg_voltage:.2f} V")
-                self.power_value_label.setText(f"{power:.2f} mW")
+        # 更新数值标签
+        try:
+            self.current_voltage_label.setText(f"{voltage:.2f} V")
+            self.current_current_label.setText(f"{current:.2f} mA")
+            self.current_power_label.setText(f"{power:.2f} mW")
+        except RuntimeError:
+            return
 
-                # 添加到测试数据
-                timestamp = time.time()
-                self.test_data.append({
-                    'timestamp': timestamp,
-                    'current': avg_current,
-                    'voltage': avg_voltage,
-                    'power': power
-                })
+        # 更新统计值
+        if self.current_data:
+            avg_current = sum(self.current_data) / len(self.current_data)
+            max_current = max(self.current_data)
+            min_current = min(self.current_data)
+            total_power = sum(self.power_data) / 3600  # 转换为mAh
 
-                # 更新图表
-                self.update_charts(timestamp, avg_current, avg_voltage, power)
-        except Exception as e:
-            Logger.log(f"获取数据失败: {str(e)}", "ERROR")
+            try:
+                self.avg_current_label.setText(f"{avg_current:.2f} mA")
+                self.max_current_label.setText(f"{max_current:.2f} mA")
+                self.min_current_label.setText(f"{min_current:.2f} mA")
+                self.total_power_label.setText(f"{total_power:.4f} mAh")
+            except RuntimeError:
+                return
+
+        # 更新数据点数和测试时长
+        try:
+            self.data_points_label.setText(str(len(self.time_data)))
+            elapsed_time = time.time() - self.start_time
+            self.test_duration_label.setText(f"{elapsed_time:.1f} s")
+        except RuntimeError:
+            return
 
     def update_data_preview(self):
         """更新数据预览"""
@@ -490,16 +679,14 @@ class PowerAnalysisPage(QWidget):
                 self.test_sequence_table.setItem(current_row + 1, col, item)
             
             self.test_sequence_table.selectRow(current_row + 1)
-    
+
     def toggle_pause(self):
         """暂停/继续数据更新"""
         if self.pause_btn.text() == "暂停":
-            self.update_timer.stop()
             self.pause_btn.setText("继续")
         else:
-            self.update_timer.start(100)
             self.pause_btn.setText("暂停")
-    
+
     def clear_data(self):
         """清除所有数据"""
         self.data_processor.clear_data()
@@ -831,12 +1018,6 @@ class PowerAnalysisPage(QWidget):
         for port in ports:
             self.port_combo.addItem(port.device)
 
-    def update_sampling_interval(self):
-        """更新采样间隔"""
-        self.sampling_interval = self.interval_spin.value()
-        if hasattr(self, 'update_timer'):
-            self.update_timer.setInterval(self.sampling_interval)
-
     def toggle_connection(self):
         """切换连接状态"""
         if self.connect_btn.text() == "连接设备":
@@ -937,18 +1118,17 @@ class PowerAnalysisPage(QWidget):
                     background-color: #dd6161;
                 }
             """)
-            
+
             # 清空数据
             self.data_processor.clear_data()
             self.current_curve.setData([], [])
             self.voltage_curve.setData([], [])
             self.power_curve.setData([], [])
-            
+
             # 启动定时器
-            self.update_timer.start(100)
             self.progress_timer.start(1000)
             self.stats_timer.start(1000)
-            
+
             self.log_message("测试开始")
             self.test_started.emit()
         else:
@@ -970,11 +1150,10 @@ class PowerAnalysisPage(QWidget):
                     background-color: #5daf34;
                 }
             """)
-            
+
             # 停止定时器
-            self.update_timer.stop()
             self.progress_timer.stop()
             self.stats_timer.stop()
-            
+
             self.log_message("测试结束")
             self.test_finished.emit()
