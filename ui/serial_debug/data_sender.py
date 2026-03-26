@@ -57,7 +57,7 @@ class SendWorker(QThread):
 
 class DataSender(QObject):
     # 定义信号
-    data_sent = pyqtSignal(int)  # 数据发送成功信号
+    data_sent = pyqtSignal(bytes)  # 数据发送成功信号
     send_failed = pyqtSignal(str)  # 发送失败信号
 
     def __init__(self, parent=None):
@@ -112,11 +112,7 @@ class DataSender(QObject):
 
     def _on_timer_send(self) -> None:
         """定时发送超时处理"""
-        print(f"_on_timer_send 被调用，is_timer_sending: {self.is_timer_sending}")
-
         if self.is_timer_sending:
-            print("定时发送超时")
-
             # 检查发送文本框
             if not self.send_edit:
                 print("发送文本框未设置")
@@ -124,7 +120,6 @@ class DataSender(QObject):
 
             # 获取文本框内容
             text = self.send_edit.toPlainText()
-            print(f"发送文本框内容: '{text}'")
 
             # 尝试发送数据
             self.send_data(None)
@@ -167,20 +162,7 @@ class DataSender(QObject):
             success = self.serial_manager.send_data(send_bytes)
 
             if success:
-                # 记录发送日志
-                print(f"数据发送成功{send_bytes}")
-                display_data = send_bytes.decode('utf-8', errors='ignore')
-                if self.hex_send:
-                    display_data = send_bytes.hex(' ').upper()
-
-                # 显示发送数据
-                self._display_sent_data(display_data)
-
-                # 记录日志
-                if self.log_manager:
-                    self.log_manager.write_sent_log(display_data)
-
-                self.data_sent.emit(data)
+                self.data_sent.emit(send_bytes)
                 return True
         except Exception as e:
             Logger.log(f"发送数据失败: {str(e)}", "ERROR")
@@ -198,7 +180,7 @@ class DataSender(QObject):
         if self.show_timestamp:
             timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
             # 使用纯文本格式，不使用HTML标签
-            display_data = f'[{timestamp}]发送{display_data}'
+            display_data = f'[{timestamp}]发送→◇{display_data}'
 
         # 使用QPlainTextEdit的方式添加文本 - 修改这里
         cursor = self.recv_text.textCursor()

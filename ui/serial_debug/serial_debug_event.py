@@ -283,8 +283,6 @@ class SerialDebugTabEvents:
             return
 
         try:
-            print("将发送的数据显示到接收区")
-
             # 格式化发送数据（添加发送标识）
             display_data = data
             if self.tab.data_sender.show_timestamp:

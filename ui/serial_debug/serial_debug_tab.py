@@ -291,12 +291,8 @@ class SerialDebugTab(QWidget):
             }
         """)
 
-        # 创建行号区域
-        self.line_number_area = LineNumberArea(self.recv_text)
         # 连接信号
         self.recv_text.textChanged.connect(lambda: self.recv_text.updateLineNumberAreaWidth(0))
-        # 添加到布局
-        recv_text_layout.addWidget(self.line_number_area)
         recv_text_layout.addWidget(self.recv_text, 1)
         recv_layout.addWidget(recv_text_container)
 
@@ -509,18 +505,24 @@ class SerialDebugTab(QWidget):
             return
 
         try:
-            print("将发送的数据显示到接收区")
             # 转换数据为字符串
             if isinstance(data, bytes):
+                # 使用 errors='replace' 替换无法解码的字节
                 data_str = data.decode('utf-8', errors='replace')
+            elif isinstance(data, str):
+                # 如果已经是字符串，直接使用
+                data_str = data
             else:
+                # 其他类型，转换为字符串
                 data_str = str(data)
 
             # 格式化发送数据（添加发送标识）
             display_data = data_str
             if self.data_receiver.show_timestamp:
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-                display_data = f'[{timestamp}]发送{display_data}'
+
+                display_data = f'[{timestamp}]发送→◇{display_data}'
+                print(f'发送数据......: {display_data}')
 
             # 使用QPlainTextEdit的方式添加文本
             cursor = self.data_receiver.recv_text.textCursor()
@@ -796,9 +798,6 @@ class LineNumberTextEdit(QPlainTextEdit):
         # 检查控件是否可见
         if not self.isVisible() or not self.lineNumberArea.isVisible():
             return
-
-        # 使用延迟更新，避免频繁绘制
-        QTimer.singleShot(0, self.updateLineNumberAreaWidth)
 
     def closeEvent(self, event):
         """关闭事件处理"""
