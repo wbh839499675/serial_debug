@@ -8,6 +8,7 @@ from utils.logger import Logger
 import time
 from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
 from PyQt5.QtCore import QObject, pyqtSignal, QIODevice
+#from ui.serial_debug.statistics_manager import StatisticsManager
 
 class SerialPortManager(QObject):
     """串口管理类"""
@@ -17,6 +18,8 @@ class SerialPortManager(QObject):
     disconnected = pyqtSignal(str)  # 断开连接信号
     connection_failed = pyqtSignal(str, str)  # 连接失败信号
     data_received = pyqtSignal(bytes)  # 数据接收信号
+    send_bytes_updated = pyqtSignal(int)
+    recv_bytes_updated = pyqtSignal(int)
     port_removed = pyqtSignal(str)  # 串口移除信号
     port_reinserted = pyqtSignal(str)  # 串口重新插入信号
 
@@ -33,6 +36,13 @@ class SerialPortManager(QObject):
         self.auto_reconnect = True
         self._port_removed = False  # 使用下划线前缀表示私有属性
         self._reader = None
+
+        # 统计数据
+        self.total_send_bytes = 0
+        self.total_recv_bytes = 0
+
+        # 统计管理器初始化
+        #self.statistics_manager = StatisticsManager(self)
 
     def connect(self, port_name: str, baudrate: int = 115200,
            databits: int = 8, stopbits: float = 1,
@@ -110,7 +120,10 @@ class SerialPortManager(QObject):
         """发送数据"""
         try:
             if self.serial_port and self.serial_port.isOpen():
-                return self.serial_port.write(data) == len(data)
+                send_bytes = self.serial_port.write(data)
+                self.total_send_bytes += send_bytes
+                self.send_bytes_updated.emit(self.total_send_bytes)
+                return (send_bytes == len(data))
             return False
         except Exception as e:
             Logger.error(f"发送数据异常: {str(e)}", module='serial_port_manager')
@@ -122,6 +135,8 @@ class SerialPortManager(QObject):
             data = self.serial_port.readAll()
             if data:
                 self.data_received.emit(bytes(data))
+                self.total_recv_bytes += len(data)
+                self.recv_bytes_updated.emit(self.total_recv_bytes)
 
     def check_port_status(self, available_ports: list) -> None:
         """检查串口状态"""

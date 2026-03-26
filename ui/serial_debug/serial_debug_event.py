@@ -100,7 +100,9 @@ class SerialDebugTabEvents:
     def on_clear_recv(self):
         """清除接收数据"""
         self.tab.data_receiver.clear_data()
-        self.tab.statistics_manager.clear_stats()
+        self.tab.serial_manager.total_send_bytes = 0
+        self.tab.serial_manager.total_recv_bytes = 0
+        self.tab._clear_stats()
 
     def on_show_serial_config(self):
         """显示串口配置对话框"""

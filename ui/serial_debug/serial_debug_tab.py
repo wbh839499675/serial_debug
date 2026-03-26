@@ -12,7 +12,7 @@ from ui.serial_debug.serial_debug_event import SerialDebugTabEvents
 from ui.serial_debug.data_receiver import DataReceiver
 from ui.serial_debug.data_sender import DataSender
 from ui.serial_debug.command_manager import CommandManager
-from ui.serial_debug.statistics_manager import StatisticsManager
+#from ui.serial_debug.statistics_manager import StatisticsManager
 from utils.constants import (
     get_page_text_edit_style,
     get_page_button_style,
@@ -28,6 +28,8 @@ class SerialDebugTab(QWidget):
 
     # 定义信号
     data_received = pyqtSignal(str)
+    send_bytes_updated = pyqtSignal(int)
+    recv_bytes_updated = pyqtSignal(int)
 
     def __init__(self, port_name=None, parent=None):
         super().__init__(parent)
@@ -44,6 +46,9 @@ class SerialDebugTab(QWidget):
 
         # 初始化串口管理器
         self.serial_manager = SerialPortManager(self)
+
+        # 初始化统计管理器
+        #self.statistics_manager = StatisticsManager(self)
 
         # 先初始化事件处理器
         self.events = SerialDebugTabEvents(self)
@@ -85,19 +90,21 @@ class SerialDebugTab(QWidget):
         self.serial_manager.connected.connect(self._on_connected)
         self.serial_manager.disconnected.connect(self._on_disconnected)
         self.serial_manager.connection_failed.connect(self._on_connection_failed)
+        self.serial_manager.send_bytes_updated.connect(self._on_send_stats_updated)
+        self.serial_manager.recv_bytes_updated.connect(self._on_recv_stats_updated)
 
         # 关键修改：直接连接串口管理器的数据接收信号到数据接收器
         self.serial_manager.data_received.connect(self.data_receiver.process_data)
 
         # 可选：如果需要处理原始数据，可以保留这个连接
-        self.serial_manager.data_received.connect(self._on_data_received)
+        #self.serial_manager.data_received.connect(self._on_data_received)
 
     def _init_components(self):
         """初始化功能组件"""
         self.data_receiver = DataReceiver(self)
         self.data_sender = DataSender(self)
         self.command_manager = CommandManager(self)
-        self.statistics = StatisticsManager(self)
+        #self.statistics = StatisticsManager(self)
 
         # 设置命令管理器的数据发送器
         self.command_manager.set_serial_sender(self.data_sender)
@@ -477,6 +484,21 @@ class SerialDebugTab(QWidget):
 
         except Exception as e:
             Logger.error(f"处理接收数据异常: {str(e)}", module='serial_debug')
+
+    def _on_send_stats_updated(self, total_bytes: int):
+        """发送统计更新处理"""
+        if self.sent_count_label:
+            self.sent_count_label.setText(f"发送字节数: {total_bytes}")
+
+    def _on_recv_stats_updated(self, total_bytes: int):
+        """接收统计更新处理"""
+        if self.recv_count_label:
+            self.recv_count_label.setText(f"接收字节数: {total_bytes}")
+
+    def _clear_stats(self) -> None:
+        """清除统计"""
+        self.sent_count_label.setText(f"发送字节数: 0")
+        self.recv_count_label.setText(f"接收字节数: 0")
 
     def _on_data_sent(self, data: bytes):
         """处理发送的数据，显示到接收区"""

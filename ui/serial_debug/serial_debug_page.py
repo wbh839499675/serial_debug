@@ -39,7 +39,6 @@ from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.data_receiver import DataReceiver
 from ui.serial_debug.data_sender import DataSender
 from ui.serial_debug.command_manager import CommandManager
-from ui.serial_debug.statistics_manager import StatisticsManager
 from ui.serial_debug.data_display import DataDisplay
 from core.serial_controller import SerialReader
 
