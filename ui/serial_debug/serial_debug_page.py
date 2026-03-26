@@ -216,5 +216,40 @@ class SerialDebugPage(QWidget):
 
     def update_status(self):
         """更新状态显示"""
-        # 更新设备数量和连接数量
-        pass
+        self.device_count_label.setText(f"串口数: {self.device_count}")
+
+        connected_count = 0
+        status_messages = []
+
+        for port, (tab, _) in self.device_tabs.items():
+            if tab.is_connected:
+                connected_count += 1
+                # 构建每个连接设备的详细信息
+                parity_map = {
+                    serial.PARITY_NONE: 'N',
+                    serial.PARITY_EVEN: 'E',
+                    serial.PARITY_ODD: 'O',
+                    serial.PARITY_MARK: 'M',
+                    serial.PARITY_SPACE: 'S'
+                }
+                parity_char = parity_map.get(tab.parity, 'N')
+                rtscts_text = "RTS/CTS" if tab.rtscts else "N"
+
+                device_info = f"{port}: {tab.baudrate},{tab.databits},{tab.stopbits},{parity_char},{rtscts_text}"
+                status_messages.append(device_info)
+                Logger.log(f"端口 {port} 已连接", "DEBUG")
+            else:
+                Logger.log(f"端口 {port} 未连接", "DEBUG")
+
+        print("更新状态栏")
+        self.connected_count_label.setText(f"已连接: {connected_count}/{self.device_count}")
+
+        # 更新整体状态
+        if connected_count == 0:
+            self.status_label.setText("所有设备已断开")
+        elif connected_count == self.device_count:
+            # 显示所有连接设备的详细信息
+            self.status_label.setText(" | ".join(status_messages))
+        else:
+            # 显示已连接设备的详细信息
+            self.status_label.setText(" | ".join(status_messages))

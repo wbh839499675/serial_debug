@@ -31,6 +31,7 @@ class SerialDebugTab(QWidget):
 
     def __init__(self, port_name=None, parent=None):
         super().__init__(parent)
+        self.parent = parent
         self.port_name = port_name
         self.is_connected = False
 
@@ -130,7 +131,9 @@ class SerialDebugTab(QWidget):
         Logger.log(f"串口 {port_name} 已打开", "SUCCESS")
 
         # 通知父页面更新状态
+        print("打开串口,开始更新状态栏...")
         if self.parent and hasattr(self.parent, 'update_status'):
+            print("打开串口,开始更新状态栏")
             self.parent.update_status()
 
         # 启用发送和接收
@@ -165,6 +168,7 @@ class SerialDebugTab(QWidget):
 
         # 通知父页面更新状态
         if self.parent and hasattr(self.parent, 'update_status'):
+            print("关闭串口,开始更新状态栏")
             self.parent.update_status()
 
         # 禁用发送和接收

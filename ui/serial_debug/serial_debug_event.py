@@ -52,12 +52,6 @@ class SerialDebugPageEvents:
             # 切换到已存在的标签页
             device_tab, tab_index = self.page.device_tabs[port_name]
             self.page.tab_widget.setCurrentIndex(tab_index)
-
-            # 切换连接状态
-            if device_tab.is_connected:
-                device_tab.disconnect()
-            else:
-                device_tab.connect()
         else:
             # 创建新的设备标签页
             self.page.create_device_tab(port_name)
