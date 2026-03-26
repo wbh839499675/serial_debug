@@ -41,8 +41,8 @@ class SerialPortManager(QObject):
         self.total_send_bytes = 0
         self.total_recv_bytes = 0
 
-        # 统计管理器初始化
-        #self.statistics_manager = StatisticsManager(self)
+        # 暂停接收标志
+        self._pause_recv = False
 
     def connect(self, port_name: str, baudrate: int = 115200,
            databits: int = 8, stopbits: float = 1,
@@ -132,6 +132,10 @@ class SerialPortManager(QObject):
     def _on_data_ready(self):
         """数据就绪处理"""
         if self.serial_port and self.serial_port.isOpen():
+            # 检查是否暂停接收
+            if self._pause_recv:
+                return
+
             data = self.serial_port.readAll()
             if data:
                 self.data_received.emit(bytes(data))
@@ -155,3 +159,12 @@ class SerialPortManager(QObject):
     def is_connected(self) -> bool:
         """检查串口连接状态"""
         return self.is_connected and self.serial_port and self.serial_port.is_open
+
+    def set_pause_recv(self, pause: bool):
+        """设置暂停接收状态"""
+        self._pause_recv = pause
+        Logger.log(f"串口接收状态: {'暂停' if pause else '恢复'}", "DEBUG")
+
+    def is_paused(self) -> bool:
+        """检查是否暂停接收"""
+        return self._pause_recv

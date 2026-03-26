@@ -77,7 +77,7 @@ class SerialDebugTabEvents:
 
     def on_pause_recv_changed(self, state):
         """暂停接收改变"""
-        self.tab.data_receiver.pause_recv = (state == Qt.Checked)
+        self.tab.serial_manager.set_pause_recv(state == Qt.Checked)
 
     def on_auto_save_changed(self, state):
         """自动保存改变"""
@@ -497,7 +497,6 @@ class SerialDebugTabEvents:
         else:
             Logger.log("搜索对话框不存在", "ERROR")
 
-
     def on_show_line_numbers_changed(self, state):
         """显示行号改变"""
         if state == Qt.Checked:
@@ -510,6 +509,8 @@ class SerialDebugTabEvents:
             self.tab.line_number_area.setVisible(False)
             # 重置TextEdit的左边距
             self.tab.recv_text.setViewportMargins(0, 0, 0, 0)
+        self.tab.line_number_area.setVisible(True)
+        self.tab.updateLineNumberAreaWidth(0)
 
     def on_show_display_config(self):
         """显示显示配置对话框"""
