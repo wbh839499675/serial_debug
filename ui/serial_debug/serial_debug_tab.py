@@ -4,7 +4,9 @@ from PyQt5.QtWidgets import (
     QPushButton, QCheckBox, QLineEdit, QPlainTextEdit, QSplitter, QDialog, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal, QSize
-from PyQt5.QtGui import QPainter, QColor, QTextFormat, QFont, QTextCursor
+from PyQt5.QtGui import (
+    QPainter, QColor, QTextFormat, QFont, QTextCursor, QTextCharFormat
+)
 
 from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.serial_debug_layout import SerialDebugTabLayout
@@ -535,6 +537,169 @@ class SerialDebugTab(QWidget):
         except Exception as e:
             Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')
 
+    def search_in_log(self, text: str, case_sensitive: bool, use_regex: bool, whole_word: bool, start_position: int = 0) -> list:
+        """在日志中搜索文本
+
+        Args:
+            text: 搜索文本
+            case_sensitive: 是否区分大小写
+            use_regex: 是否使用正则表达式
+            whole_word: 是否全词匹配
+            start_position: 搜索起始位置
+
+        Returns:
+            匹配位置列表，每个元素为 (start_pos, end_pos) 元组
+        """
+        Logger.log(f"开始搜索: {text}, 区分大小写: {case_sensitive}, 正则表达式: {use_regex}, 全词匹配: {whole_word}, 起始位置: {start_position}", "DEBUG")
+
+        # 获取接收区文本
+        document = self.recv_text.document()
+        plain_text = document.toPlainText()
+
+        if not text or not plain_text:
+            Logger.log("搜索文本或接收区为空", "DEBUG")
+            return []
+
+        results = []
+
+        try:
+            if use_regex:
+                # 正则表达式搜索
+                flags = 0 if case_sensitive else re.IGNORECASE
+                pattern = re.compile(text, flags)
+
+                for match in pattern.finditer(plain_text):
+                    start = match.start()
+                    end = match.end()
+                    # 只添加起始位置之后的匹配项
+                    if start >= start_position:
+                        results.append((start, end))
+                        Logger.log(f"找到匹配: 位置 {start}-{end}", "DEBUG")
+            else:
+                # 普通文本搜索
+                search_text = text
+                search_content = plain_text
+
+                if not case_sensitive:
+                    search_text = text.lower()
+                    search_content = plain_text.lower()
+
+                if whole_word:
+                    # 全词匹配 - 使用更精确的匹配方式
+                    word_pattern = r'(^|\W)' + re.escape(text) + r'($|\W)'
+                    flags = 0 if case_sensitive else re.IGNORECASE
+                    pattern = re.compile(word_pattern, flags)
+
+                    for match in pattern.finditer(plain_text):
+                        start = match.start()
+                        end = match.end()
+                        # 调整匹配位置，排除前后的非单词字符
+                        if match.group(1):
+                            start += len(match.group(1))
+                        if match.group(2):
+                            end -= len(match.group(2))
+
+                        # 只添加起始位置之后的匹配项
+                        if start >= start_position:
+                            results.append((start, end))
+
+                else:
+                    # 普通搜索
+                    start = max(start_position, 0)
+                    while True:
+                        pos = search_content.find(search_text, start)
+                        if pos == -1:
+                            break
+                        end = pos + len(text)
+                        results.append((pos, end))
+                        start = end
+                        Logger.log(f"找到匹配: 位置 {pos}-{end}", "DEBUG")
+        except Exception as e:
+            Logger.log(f"搜索出错: {str(e)}", "ERROR")
+            return []
+
+        Logger.log(f"搜索完成，找到 {len(results)} 个匹配项", "DEBUG")
+        return results
+
+    def highlight_search_result(self, start_pos: int, end_pos: int, scroll_to: bool = True, all_matches: list = None):
+        """高亮显示搜索结果
+
+        Args:
+            start_pos: 起始位置
+            end_pos: 结束位置
+            scroll_to: 是否滚动到匹配位置
+            all_matches: 所有匹配位置列表，用于高亮所有匹配项
+        """
+        Logger.log(f"高亮搜索结果: {start_pos}-{end_pos}, 滚动: {scroll_to}", "DEBUG")
+
+        # 获取文档和光标
+        document = self.recv_text.document()
+        cursor = self.recv_text.textCursor()
+
+        # 只清除之前的高亮，而不是清除所有格式
+        # 保存当前文档的原始格式
+        original_format = QTextCharFormat()
+
+        # 如果提供了所有匹配项，高亮所有匹配项
+        if all_matches:
+            for match_start, match_end in all_matches:
+                cursor.setPosition(match_start)
+                cursor.setPosition(match_end, QTextCursor.KeepAnchor)
+                format = QTextCharFormat()
+                format.setBackground(QColor(255, 255, 0, 100))  # 半透明黄色背景
+                cursor.mergeCharFormat(format)
+                Logger.log(f"高亮匹配项: {match_start}-{match_end}", "DEBUG")
+
+        # 高亮当前匹配项
+        cursor.setPosition(start_pos)
+        cursor.setPosition(end_pos, QTextCursor.KeepAnchor)
+        format = QTextCharFormat()
+        format.setBackground(QColor(255, 165, 0))  # 橙色背景
+        cursor.mergeCharFormat(format)
+
+        # 滚动到匹配位置
+        if scroll_to:
+            self.recv_text.setTextCursor(cursor)
+            self.recv_text.ensureCursorVisible()
+
+        Logger.log("高亮完成", "DEBUG")
+
+
+    def _on_recv_text_double_click(self, event):
+        """处理接收区双击事件"""
+        # 获取当前光标位置
+        cursor = self.recv_text.textCursor()
+        position = cursor.position()
+
+        # 更新搜索对话框的起始位置
+        if hasattr(self, 'search_dialog'):
+            self.search_dialog.search_start_position = position
+            Logger.log(f"双击接收区，设置搜索起始位置: {position}", "DEBUG")
+
+    def cleanup(self):
+        """清理资源"""
+        try:
+            # 关键修改：先断开信号连接
+            if hasattr(self, 'recv_text'):
+                # 断开文本变化信号
+                try:
+                    self.recv_text.textChanged.disconnect()
+                except:
+                    pass
+
+                # 设置销毁标志
+                self.recv_text._is_destroying = True
+
+                # 清理行号区域
+                if hasattr(self.recv_text, 'lineNumberArea'):
+                    self.recv_text.lineNumberArea._is_destroying = True
+                    self.recv_text.lineNumberArea.deleteLater()
+
+                # 删除文本框
+                self.recv_text.deleteLater()
+        except Exception as e:
+            Logger.error(f"清理资源时出错: {str(e)}", module='serial_debug')
+
 
 class LineNumberArea(QWidget):
     """行号区域控件"""
@@ -547,22 +712,35 @@ class LineNumberArea(QWidget):
         return QSize(self.editor.lineNumberAreaWidth(), 0)
 
     def paintEvent(self, event):
-        # 检查是否正在销毁
+        # 多重检查，确保不会在销毁后绘制
         if self._is_destroying:
             return
 
-        # 获取编辑器的父级SerialDebugTab对象
-        parent = self.editor.parent()
-        while parent and not isinstance(parent, SerialDebugTab):
-            parent = parent.parent()
+        parent = self.parent()
+        if not parent or getattr(parent, '_is_destroying', False):
+            return
 
-        # 检查父级对象是否存在且未在销毁
-        if parent and not getattr(parent, '_is_destroying', False):
+        editor = self.editor
+        if not editor or getattr(editor, '_is_destroying', False):
+            return
+
+        # 关键修改：检查绘制设备是否有效
+        if not self.testAttribute(Qt.WA_WState_Created):
+            return
+
+        if not self.isVisible() or not editor.isVisible():
+            return
+
+        # 关键修改：检查窗口是否处于正常状态
+        if not self.window().testAttribute(Qt.WA_WState_Created):
+            return
+
+        # 调用编辑器的绘制方法
+        if hasattr(self.editor, 'lineNumberAreaPaintEvent'):
             try:
-                parent.lineNumberAreaPaintEvent(event)
+                self.editor.lineNumberAreaPaintEvent(event)
             except Exception as e:
-                # 捕获绘制过程中的异常，防止程序崩溃
-                pass
+                Logger.error(f"绘制行号区域失败: {str(e)}", module='serial_debug')
 
 class LineNumberTextEdit(QPlainTextEdit):
     """带行号功能的文本编辑框"""
@@ -572,12 +750,93 @@ class LineNumberTextEdit(QPlainTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._is_destroying = False
         self.lineNumberArea = LineNumberArea(self)
 
-        self.blockCountChanged.connect(self.updateLineNumberAreaWidth)
-        self.document().blockCountChanged.connect(self.updateLineNumberAreaWidth)
-        self.updateRequest.connect(self.updateLineNumberArea)
+        # 保存所有信号连接
+        self._signal_connections = []
+
+        # 连接信号并保存引用
+        self._connect_signal(self.blockCountChanged, self.updateLineNumberAreaWidth)
+        self._connect_signal(self.document().blockCountChanged, self.updateLineNumberAreaWidth)
+        self._connect_signal(self.updateRequest, self.updateLineNumberArea)
+        self._connect_signal(self.textChanged, self._on_text_changed)
+
+        # 监听滚动条值变化
+        self.verticalScrollBar().valueChanged.connect(self._on_scroll_value_changed)
+
         self.updateLineNumberAreaWidth(0)
+
+    def _connect_signal(self, signal, slot):
+        """连接信号并保存引用"""
+        signal.connect(slot)
+        self._signal_connections.append((signal, slot))
+
+    def _on_text_changed(self):
+        """文本变化处理"""
+        # 检查是否正在销毁
+        if self._is_destroying:
+            return
+
+        # 检查绘制设备是否有效
+        if not self.testAttribute(Qt.WA_WState_Created):
+            return
+
+        # 检查行号区域是否有效
+        if not hasattr(self, 'lineNumberArea'):
+            return
+
+        if not self.lineNumberArea.testAttribute(Qt.WA_WState_Created):
+            return
+
+        # 检查窗口是否处于正常状态
+        if not self.window().testAttribute(Qt.WA_WState_Created):
+            return
+
+        # 检查控件是否可见
+        if not self.isVisible() or not self.lineNumberArea.isVisible():
+            return
+
+        # 使用延迟更新，避免频繁绘制
+        QTimer.singleShot(0, self.updateLineNumberAreaWidth)
+
+    def closeEvent(self, event):
+        """关闭事件处理"""
+        self._is_destroying = True
+
+        # 断开所有信号连接
+        for signal, slot in self._signal_connections:
+            try:
+                signal.disconnect(slot)
+            except:
+                pass
+
+        # 清理行号区域
+        if hasattr(self, 'lineNumberArea'):
+            self.lineNumberArea._is_destroying = True
+            self.lineNumberArea.setParent(None)
+            self.lineNumberArea.deleteLater()
+
+        # 清理文档对象
+        try:
+            self.document().setModified(False)
+            self.document().clear()
+        except:
+            pass
+
+        super().closeEvent(event)
+
+    def _on_scroll_value_changed(self, value):
+        """滚动值变化处理"""
+        if not self._is_destroying and hasattr(self, 'lineNumberArea'):
+            self.lineNumberArea.update()
+
+    def scrollContentsBy(self, dx, dy):
+        """重写滚动事件"""
+        super().scrollContentsBy(dx, dy)
+        # 滚动时更新整个行号区域
+        if not self._is_destroying and hasattr(self, 'lineNumberArea'):
+            self.lineNumberArea.update()
 
     def lineNumberAreaWidth(self):
         """计算行号区域宽度"""
@@ -595,13 +854,11 @@ class LineNumberTextEdit(QPlainTextEdit):
 
     def updateLineNumberArea(self, rect, dy):
         """更新行号区域"""
-        if dy:
-            self.lineNumberArea.scroll(0, dy)
-        else:
-            self.lineNumberArea.update(0, rect.y(), self.lineNumberArea.width(), rect.height())
+        if self._is_destroying or not hasattr(self, 'lineNumberArea'):
+            return
 
-        if rect.contains(self.viewport().rect()):
-            self.updateLineNumberAreaWidth(0)
+        # 无论是滚动还是区域更新，都更新整个行号区域
+        self.lineNumberArea.update()
 
     def resizeEvent(self, event):
         """重写大小调整事件"""
@@ -611,23 +868,38 @@ class LineNumberTextEdit(QPlainTextEdit):
 
     def lineNumberAreaPaintEvent(self, event):
         """绘制行号区域"""
+        if not self.testAttribute(Qt.WA_WState_Created):
+            return
+
+        if not self.lineNumberArea.testAttribute(Qt.WA_WState_Created):
+            return
+
         painter = QPainter(self.lineNumberArea)
-        painter.fillRect(event.rect(), QColor("#f0f0f0"))
 
-        block = self.firstVisibleBlock()
-        blockNumber = block.blockNumber()
-        top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        bottom = top + self.blockBoundingRect(block).height()
+        # 检查 painter 是否处于活动状态
+        if not painter.isActive():
+            return
 
-        while block.isValid() and top <= event.rect().bottom():
-            if block.isVisible() and bottom >= event.rect().top():
-                number = str(blockNumber + 1)
-                painter.setPen(QColor("#666666"))
-                painter.drawText(0, int(top), self.lineNumberArea.width(),
-                               self.fontMetrics().height(),
-                               Qt.AlignRight, number)
+        try:
+            painter.fillRect(event.rect(), QColor("#f0f0f0"))
 
-            block = block.next()
-            top = bottom
+            block = self.firstVisibleBlock()
+            blockNumber = block.blockNumber()
+            top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
             bottom = top + self.blockBoundingRect(block).height()
-            blockNumber += 1
+
+            while block.isValid() and top <= event.rect().bottom():
+                if block.isVisible() and bottom >= event.rect().top():
+                    number = str(blockNumber + 1)
+                    painter.setPen(QColor("#000000"))
+                    painter.drawText(0, int(top), self.lineNumberArea.width(),
+                                self.fontMetrics().height(),
+                                Qt.AlignRight, number)
+
+                block = block.next()
+                top = bottom
+                bottom = top + self.blockBoundingRect(block).height()
+                blockNumber += 1
+        finally:
+            # 确保 painter 被正确销毁
+            painter.end()

@@ -8,7 +8,6 @@ from utils.logger import Logger
 import time
 from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
 from PyQt5.QtCore import QObject, pyqtSignal, QIODevice
-#from ui.serial_debug.statistics_manager import StatisticsManager
 
 class SerialPortManager(QObject):
     """串口管理类"""

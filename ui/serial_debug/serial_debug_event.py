@@ -492,7 +492,7 @@ class SerialDebugTabEvents:
                 self.tab.search_dialog.next_btn.setEnabled(False)
                 self.tab.search_dialog.prev_btn.setEnabled(False)
                 # 清空匹配行内容显示
-                self.tab.search_dialog.match_content_text.clear()
+                self.tab.search_dialog.match_content_table.setRowCount(0)
                 Logger.log("未找到匹配项", "DEBUG")
         else:
             Logger.log("搜索对话框不存在", "ERROR")
