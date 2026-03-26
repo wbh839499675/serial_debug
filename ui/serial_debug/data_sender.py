@@ -67,7 +67,7 @@ class DataSender(QObject):
         self.serial_manager = None
         self.log_manager = None
         self.hex_send = False
-        self.add_crlf = False
+        self.add_crlf = True
         self.total_send_bytes = 0
         self.show_timestamp = True
 

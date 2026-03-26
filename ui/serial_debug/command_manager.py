@@ -115,14 +115,14 @@ class DraggableCommandRow(QWidget):
             event.acceptProposedAction()
         else:
             event.ignore()
-    
+
     def dragMoveEvent(self, event):
         """拖拽移动事件"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
             event.acceptProposedAction()
         else:
             event.ignore()
-    
+
     def dropEvent(self, event):
         """放下事件"""
         if event.mimeData().hasText() and event.mimeData().text().startswith("command_row:"):
@@ -169,9 +169,16 @@ class CommandManager(QObject):
         # 数据发送器
         self.data_sender = None
 
+        # 串口管理器
+        self.serial_manager = None
+
         # 初始化定时器
         self.loop_timer = QTimer(self)
         self.loop_timer.timeout.connect(self._send_next_command)
+
+    def set_serial_manager(self, manager) -> None:
+        """设置串口管理器"""
+        self.serial_manager = manager
 
     def set_commands_container(self, container: QWidget, layout: QVBoxLayout) -> None:
         """设置命令容器"""
@@ -459,6 +466,11 @@ class CommandManager(QObject):
             self.command_send_failed.emit("命令不能为空")
             return
 
+        # 检查串口连接状态
+        if not self.serial_manager or not self.serial_manager.is_connected:
+            self.command_send_failed.emit("串口未连接")
+            return
+
         # 获取延时时间
         try:
             delay = int(delay_edit.text()) if delay_edit.text() else 0
@@ -466,21 +478,40 @@ class CommandManager(QObject):
             self.command_send_failed.emit("延时时间格式错误")
             return
 
-        # 检查数据发送器是否可用
-        if not self.data_sender:
-            self.command_send_failed.emit("数据发送器未初始化")
-            return
+        # 处理十六进制发送
+        if self.data_sender.hex_send:
+            try:
+                data_bytes = bytes.fromhex(command_text.replace(' ', ''))
+            except ValueError:
+                self.command_send_failed.emit("十六进制数据格式错误")
+                return
+        else:
+            # 普通文本发送
+            data_bytes = command_text.encode('utf-8')
 
-        # 通过数据发送器发送命令
+        # 检查是否添加回车换行
+        if self.data_sender.add_crlf:
+            print("添加回车换行")
+            data_bytes += b'\r\n'
+
+        print("不添加回车换行")
+
+        # 发送数据
         try:
-            self.data_sender.send_data(command_text)
-            # 发送命令信号
-            self.command_sent.emit(command_text)
-            Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
+            success = self.serial_manager.send_data(data_bytes)
+            if success:
+                # 发送命令信号
+                self.command_sent.emit(command_text)
+                Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
+
+                # 显示发送的数据到接收区
+                #self._display_sent_data(command_text, data_bytes)
+            else:
+                self.command_send_failed.emit("发送命令失败")
+                Logger.log(f"发送命令失败: {command_text}", "ERROR")
         except Exception as e:
             self.command_send_failed.emit(f"发送命令失败: {str(e)}")
             Logger.log(f"发送命令失败: {str(e)}", "ERROR")
-
 
     def toggle_loop_send(self, checked: bool) -> None:
         """切换循环发送状态"""

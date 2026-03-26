@@ -107,6 +107,9 @@ class SerialDebugTab(QWidget):
         # 设置串口管理器
         self.data_sender.set_serial_manager(self.serial_manager)
 
+        # 设置命令管理器的串口管理器
+        self.command_manager.set_serial_manager(self.serial_manager)
+
     def _on_connected(self, port_name: str):
         """连接成功处理"""
         Logger.log(f"已连接至串口：{port_name}", "INFO")
