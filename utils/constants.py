@@ -158,28 +158,28 @@ def get_group_style(style_type: str = 'default') -> str:
 # 按钮尺寸常量
 BUTTON_SIZES = {
     'tiny': {
-        'width': 40,
-        'height': 24,
+        'width': 36,
+        'height': 22,
         'font_size': 8
     },
     'small': {
-        'width': 80,
-        'height': 28,
+        'width': 72,
+        'height': 26,
         'font_size': 9
     },
     'normal': {
-        'width': 100,
-        'height': 32,
+        'width': 66,
+        'height': 30,
         'font_size': 10
     },
     'large': {
-        'width': 120,
-        'height': 36,
+        'width': 104,
+        'height': 34,
         'font_size': 11
     },
     'icon': {
-        'width': 36,
-        'height': 36,
+        'width': 32,
+        'height': 32,
         'font_size': 10
     }
 }
@@ -856,7 +856,7 @@ PAGE_BUTTON_STYLES = {
         'config': ('info', 'small'),
         'refresh': ('success', 'small'),
         'toggle_commands': ('toggle', 'small'),
-        'add_command': ('success', 'normal'),
+        'add_command': ('success', 'small'),
         'clear_command': ('danger', 'small'),
         'import': ('success', 'small'),
         'export': ('success', 'small'),
@@ -866,8 +866,8 @@ PAGE_BUTTON_STYLES = {
 
     # 摄像头调试页面
     'camera': {
-        'connect': ('primary', 'normal'),
-        'disconnect': ('danger', 'normal'),
+        'connect': ('primary', 'small'),
+        'disconnect': ('danger', 'small'),
         'start_capture': ('primary', 'small'),
         'stop_capture': ('danger', 'small'),
         'save_image': ('success', 'small'),
@@ -904,33 +904,33 @@ PAGE_BUTTON_STYLES = {
 
     # 设备测试页面
     'device_test': {
-        'connect': ('primary', 'normal'),
+        'connect': ('primary', 'small'),
         'disconnect': ('danger', 'small'),
         'start_test': ('primary', 'small'),
         'pause_test': ('warning', 'small'),
         'stop_test': ('danger', 'small'),
         'initialize': ('success', 'small'),
-        'save': ('success', 'normal'),
+        'save': ('success', 'small'),
         'import': ('success', 'small'),
         'export': ('primary', 'small'),
         'add': ('info', 'small'),
         'edit': ('warning', 'small'),
         'delete': ('danger', 'small'),
-        'refresh': ('info', 'normal'),
-        'browse_script': ('success', 'normal'),
-        'generate_template': ('info', 'normal'),
-        'show_library': ('info', 'normal'),
-        'save_log': ('success', 'normal'),
-        'clear_log': ('danger', 'normal'),
-        'export_report': ('success', 'normal'),
+        'refresh': ('info', 'small'),
+        'browse_script': ('success', 'small'),
+        'generate_template': ('info', 'small'),
+        'show_library': ('info', 'small'),
+        'save_log': ('success', 'small'),
+        'clear_log': ('danger', 'small'),
+        'export_report': ('success', 'small'),
         'power_on': ('success', 'small'),
         'power_off': ('danger', 'small'),
         'boot_on': ('success', 'small'),
         'boot_off': ('danger', 'small'),
         'reset': ('info', 'small'),
-        'reset_stats': ('info', 'normal'),
-        'apply_config': ('primary', 'normal'),
-        'reset_config': ('danger', 'normal'),
+        'reset_stats': ('info', 'small'),
+        'apply_config': ('primary', 'small'),
+        'reset_config': ('danger', 'small'),
     },
 
     # 功耗分析页面
