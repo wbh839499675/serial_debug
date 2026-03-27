@@ -403,9 +403,11 @@ class SerialDebugTabLayout:
 
         # 创建标题按钮
         import_btn = QPushButton("📥导入命令")
+        import_btn.setObjectName("import_command_btn")
         import_btn.setStyleSheet(get_page_button_style('serial_debug', 'import'))
 
         export_btn = QPushButton("💾导出命令")
+        export_btn.setObjectName("export_command_btn")
         export_btn.setStyleSheet(get_page_button_style('serial_debug', 'export'))
 
         loop_send_radio = QRadioButton("🔄 循环发送")

@@ -1115,6 +1115,9 @@ def get_page_radio_button_style(page: str, button: str, active: bool = False) ->
         QRadioButton::indicator:checked {{
             {indicator_str}
         }}
+        QRadioButton::indicator:unchecked {{
+            {base_style['indicator_normal']}
+        }}
     """
 
 

@@ -398,6 +398,7 @@ class SerialDebugTabEvents:
 
     def on_toggle_loop_send(self, checked):
         """切换循环发送"""
+        self.tab.loop_send_radio.setStyleSheet(get_page_radio_button_style('serial_debug', 'loop_send_radio', active=checked))
         self.tab.command_manager.toggle_loop_send(checked)
 
     def on_clear_commands(self):

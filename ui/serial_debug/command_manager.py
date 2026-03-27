@@ -29,6 +29,9 @@ class CommandEdit(QLineEdit):
         self.original_text = ""
         self.is_editing_placeholder = False
 
+        # 添加扩展命令面板引用
+        self.commands_panel = None
+
     def mouseDoubleClickEvent(self, event):
         """鼠标双击事件"""
         # 如果当前没有文本，或者正在编辑占位符文本
@@ -259,6 +262,7 @@ class CommandManager(QObject):
 
         # 延时时间文本框
         delay_edit = QLineEdit()
+        delay_edit.setObjectName("delay_edit")
         delay_edit.setPlaceholderText("延时(ms)")
         delay_edit.setStyleSheet(get_page_line_edit_style('serial_debug',
                                                             'delay_edit',
@@ -269,6 +273,7 @@ class CommandManager(QObject):
 
         # 删除按钮
         delete_btn = QPushButton("×")
+        delete_btn.setObjectName("delete_btn")
         delete_btn.setStyleSheet(get_page_button_style('serial_debug', 'delete', width=20, height=20))
         delete_btn.clicked.connect(lambda: self._remove_command_row(row_widget))
         row_layout.addWidget(delete_btn)
@@ -544,11 +549,23 @@ class CommandManager(QObject):
             self.is_loop_sending = True
             self.loop_send_started.emit(0)
             self.loop_send_progress.emit(1, self.command_rows)  # 立即显示第1次
+
+           # 禁用命令行按钮
+            self._disable_command_row_buttons(True)
+            # 禁用添加和清空命令按钮
+            self._disable_command_buttons(True)
+
             self._send_next_command()
         else:
             # 停止循环发送
             self.is_loop_sending = False
             self.loop_timer.stop()
+
+            # 恢复添加和清空命令按钮
+            self._disable_command_buttons(False)
+            # 恢复命令行按钮
+            self._disable_command_row_buttons(False)
+
             self.loop_send_stopped.emit(self.loop_count)
 
     def _send_next_command(self) -> None:
@@ -632,3 +649,67 @@ class CommandManager(QObject):
                         ))
 
         self.loop_send_stopped.emit(self.loop_count)
+
+    def set_commands_panel(self, panel: QWidget) -> None:
+        """设置扩展命令面板
+
+        Args:
+            panel: 扩展命令面板控件
+        """
+        self.commands_panel = panel
+
+    def _disable_command_buttons(self, disabled: bool) -> None:
+        """禁用或启用命令按钮
+
+        Args:
+            disabled: True表示禁用，False表示启用
+        """
+        if not self.commands_panel:
+            return
+
+        # 查找并禁用/启用导入命令按钮
+        import_btn = self.commands_panel.findChild(QPushButton, "import_command_btn")
+        if import_btn:
+            import_btn.setEnabled(not disabled)
+
+        # 查找并禁用/启用导出命令按钮
+        export_btn = self.commands_panel.findChild(QPushButton, "export_command_btn")
+        if export_btn:
+            export_btn.setEnabled(not disabled)
+
+        # 查找并禁用/启用添加命令按钮
+        add_btn = self.commands_panel.findChild(QPushButton, "add_command_btn")
+        if add_btn:
+            add_btn.setEnabled(not disabled)
+
+        # 查找并禁用/启用清空命令按钮
+        clear_btn = self.commands_panel.findChild(QPushButton, "clear_commands_btn")
+        if clear_btn:
+            clear_btn.setEnabled(not disabled)
+
+    def _disable_command_row_buttons(self, disabled: bool) -> None:
+        """禁用或启用命令行中的按钮
+
+        Args:
+            disabled: True表示禁用，False表示启用
+        """
+        if not self.commands_layout:
+            return
+
+        # 遍历所有命令行
+        for i in range(self.commands_layout.count() - 1):
+            widget = self.commands_layout.itemAt(i).widget()
+            if widget:
+                # 禁用/启用发送按钮
+                send_btn = widget.findChild(QPushButton, "send_btn")
+                if send_btn:
+                    send_btn.setEnabled(not disabled)
+
+                delay_edit = widget.findChild(QLineEdit, "delay_edit")
+                if delay_edit:
+                    delay_edit.setEnabled(not disabled)
+
+                # 禁用/启用删除按钮
+                delete_btn = widget.findChild(QPushButton, "delete_btn")
+                if delete_btn:
+                    delete_btn.setEnabled(not disabled)

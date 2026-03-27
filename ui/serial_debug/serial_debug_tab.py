@@ -460,6 +460,7 @@ class SerialDebugTab(QWidget):
 
         # 设置命令管理器的容器和布局
         self.command_manager.set_commands_container(commands_container, self.commands_layout)
+        self.command_manager.set_commands_panel(commands_panel)
         self.command_manager.set_serial_sender(self.data_sender)
 
         return commands_panel
