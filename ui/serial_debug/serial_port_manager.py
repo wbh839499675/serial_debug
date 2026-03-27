@@ -63,6 +63,15 @@ class SerialPortManager(QObject):
                 }
                 parity = parity_map.get(parity, QSerialPort.NoParity)
 
+            # 添加 stopbits 类型转换
+            if isinstance(stopbits, float):
+                stopbits_map = {
+                    1.0: QSerialPort.OneStop,
+                    1.5: QSerialPort.OneAndHalfStop,
+                    2.0: QSerialPort.TwoStop
+                }
+                stopbits = stopbits_map.get(stopbits, QSerialPort.OneStop)
+
             # 保存配置
             self.port_name = port_name
             self.baudrate = baudrate

@@ -21,6 +21,7 @@ from utils.constants import (
 
 from ui.dialogs import CustomMessageBox, LogSearchDialog
 
+from ui.serial_debug.serial_debug_layout import SerialDebugTabLayout
 
 class SerialDebugPageEvents:
     """串口调试页面事件处理器"""
