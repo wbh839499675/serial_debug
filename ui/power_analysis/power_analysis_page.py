@@ -3,8 +3,9 @@
 """
 import time
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox,
-    QTableWidget, QTableWidgetItem, QTabWidget, QMessageBox, QFileDialog, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QFrame,
+    QTableWidget, QTableWidgetItem, QTabWidget, QMessageBox, QFileDialog,
+    QApplication, QProgressBar, QTextEdit
 )
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
@@ -17,7 +18,6 @@ import usb.util
 import serial.tools.list_ports
 
 # 导入新创建的模块
-from ui.power_analysis.ui_component import PowerAnalysisUIComponents
 from ui.power_analysis.data_processor import PowerDataProcessor
 from ui.power_analysis.report_generator import PowerReportGenerator
 from ui.power_analysis.config_manager import PowerConfigManager
@@ -31,6 +31,7 @@ from ui.power_analysis.tools_tab import ToolsTab
 
 from core.mpa_controller import MpaController
 from utils.logger import Logger
+from utils.constants import UI_POWER_ANALYSIS
 
 """
 CAT1 ProTest Suite/
@@ -58,7 +59,6 @@ class PowerAnalysisPage(QWidget):
         self.current_mode = "Idle"
 
         # 初始化各模块
-        self.ui_components = PowerAnalysisUIComponents(self)
         self.data_processor = PowerDataProcessor(self)
         self.report_generator = PowerReportGenerator(self)
         self.config_manager = PowerConfigManager(self)
@@ -77,10 +77,10 @@ class PowerAnalysisPage(QWidget):
         # 工具栏按钮
         #self.connect_btn.clicked.connect(self.toggle_connection)
         #self.start_test_btn.clicked.connect(self.toggle_test)
-        self.save_config_btn.clicked.connect(self.save_config)
-        self.load_config_btn.clicked.connect(self.load_config)
-        self.export_btn.clicked.connect(self.export_data)
-        self.report_btn.clicked.connect(self.generate_report)
+        #self.save_config_btn.clicked.connect(self.save_config)
+        #self.load_config_btn.clicked.connect(self.load_config)
+        #self.export_btn.clicked.connect(self.export_data)
+        #self.report_btn.clicked.connect(self.generate_report)
 
         # 设备连接与配置
         #self.reset_btn.clicked.connect(self.reset_module)
@@ -137,9 +137,9 @@ class PowerAnalysisPage(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        # 创建工具栏
-        toolbar = self.ui_components.create_toolbar()
-        main_layout.addWidget(toolbar)
+        # 创建页面级工具栏
+        #toolbar = self._create_toolbar()
+        #main_layout.addWidget(toolbar)
 
         # 创建主选项卡
         self.main_tab = QTabWidget()
@@ -169,18 +169,104 @@ class PowerAnalysisPage(QWidget):
         """)
 
         # 添加各个标签页
-        self.main_tab.addTab(self.device_config_tab, "设备配置")
-        self.main_tab.addTab(self.test_plan_tab, "测试计划")
+        #self.main_tab.addTab(self.device_config_tab, "设备配置")
+        #self.main_tab.addTab(self.test_plan_tab, "测试计划")
         self.main_tab.addTab(self.monitoring_tab, "实时监测")
-        self.main_tab.addTab(self.analysis_tab, "数据分析")
-        self.main_tab.addTab(self.data_management_tab, "数据管理")
-        self.main_tab.addTab(self.tools_tab, "辅助工具")
-
+        #self.main_tab.addTab(self.analysis_tab, "数据分析")
+        #self.main_tab.addTab(self.data_management_tab, "数据管理")
+        #self.main_tab.addTab(self.tools_tab, "辅助工具")
         main_layout.addWidget(self.main_tab)
 
-        # 底部：日志和进度条
-        bottom_panel = self.ui_components.create_bottom_panel()
-        main_layout.addWidget(bottom_panel)
+        # 页面级日志和进度条
+        #bottom_panel = self._create_bottom_panel()
+        #main_layout.addWidget(bottom_panel)
+
+    def _create_toolbar(self):
+        """创建页面级工具栏"""
+        toolbar = QFrame()
+        toolbar.setStyleSheet("""
+            QFrame {
+                background-color: #f5f7fa;
+                border-radius: 4px;
+                padding: 5px;
+            }
+        """)
+        layout = QHBoxLayout(toolbar)
+        layout.setContentsMargins(10, 5, 10, 5)
+
+        # 连接/断开按钮
+        self.connect_btn = QPushButton("连接设备")
+        self.connect_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['connect'])
+        layout.addWidget(self.connect_btn)
+
+        # 开始/停止测试按钮
+        self.start_test_btn = QPushButton("开始测试")
+        self.start_test_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['start'])
+        layout.addWidget(self.start_test_btn)
+
+        # 保存配置按钮
+        self.save_config_btn = QPushButton("保存配置")
+        self.save_config_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['default'])
+        layout.addWidget(self.save_config_btn)
+
+        # 加载配置按钮
+        self.load_config_btn = QPushButton("加载配置")
+        self.load_config_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['default'])
+        layout.addWidget(self.load_config_btn)
+
+        # 导出数据按钮
+        self.export_btn = QPushButton("导出数据")
+        self.export_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['default'])
+        layout.addWidget(self.export_btn)
+
+        # 生成报告按钮
+        self.report_btn = QPushButton("生成报告")
+        self.report_btn.setStyleSheet(UI_POWER_ANALYSIS['BUTTON_STYLES']['default'])
+        layout.addWidget(self.report_btn)
+
+        layout.addStretch()
+        return toolbar
+
+    def _create_bottom_panel(self):
+        """创建底部面板：日志和进度条"""
+        bottom_panel = QWidget()
+        bottom_layout = QVBoxLayout(bottom_panel)
+        bottom_layout.setContentsMargins(5, 5, 5, 5)
+        bottom_layout.setSpacing(5)
+
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #dcdfe6;
+                border-radius: 5px;
+                text-align: center;
+                height: 20px;
+                background-color: #f5f7fa;
+            }
+            QProgressBar::chunk {
+                background-color: #409eff;
+                border-radius: 4px;
+            }
+        """)
+        bottom_layout.addWidget(self.progress_bar)
+
+        # 日志窗口
+        self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
+        self.log_output.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #dcdfe6;
+                border-radius: 4px;
+                background-color: #f5f7fa;
+                color: #606266;
+                font-family: Consolas, Monaco, 'Courier New', monospace;
+                font-size: 9pt;
+                padding: 10px;
+            }
+        """)
+        bottom_layout.addWidget(self.log_output)
+        return bottom_panel
 
     def toggle_test(self):
         """切换测试状态"""

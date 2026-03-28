@@ -1,9 +1,10 @@
 """
 功耗分析仪控制器 - 封装MPA API
 """
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
 import ctypes
 from ctypes import c_uint64, c_uint32, c_float, c_void_p, CFUNCTYPE, POINTER, Structure
-import time
+from core.usb_monitor import USBMonitorWrapper
 
 # 定义MpaSample结构体
 class MpaSample(Structure):
@@ -15,15 +16,29 @@ class MpaSample(Structure):
 # 定义回调函数类型
 CALLBACK_FUNC = CFUNCTYPE(c_uint64, c_uint64, c_uint64, c_uint32, c_uint64, c_uint64)
 
-class MpaController:
+class MpaController(QObject):
     """功耗分析仪控制器"""
+    # 定义状态变化信号
+    status_changed = pyqtSignal(bool)
+
+    # 功耗分析仪设备VID和PID
+    DEVICE_VID = 0x0483
+    DEVICE_PID = 0x5740
 
     def __init__(self):
         super().__init__()
-        self.device_id = "HID\\VID_0483&PID_5740"
         self.current_device = None
         self.callback_func = None
+        self._last_connected_state = False
         self._load_library()
+
+        # 创建USB监控实例
+        self.usb_monitor = USBMonitorWrapper(self)
+        # 注册功耗分析仪设备监控
+        self.usb_monitor.register_device(self.DEVICE_VID, self.DEVICE_PID, "功耗分析仪")
+        # 连接USB监控信号
+        self.usb_monitor.device_added.connect(self._on_device_added)
+        self.usb_monitor.device_removed.connect(self._on_device_removed)
 
     def _load_library(self):
         """加载功耗分析仪DLL"""
@@ -56,6 +71,44 @@ class MpaController:
         except Exception as e:
             print(f"加载功耗分析仪库失败: {str(e)}")
             self.lib = None
+
+    def _check_device_status(self):
+        """检查设备连接状态"""
+        try:
+            import serial.tools.list_ports
+
+            # 使用串口查找设备
+            ports = serial.tools.list_ports.comports()
+            is_connected = False
+
+            # 查找匹配VID和PID的串口
+            for port in ports:
+                if hasattr(port, 'vid') and hasattr(port, 'pid'):
+                    if port.vid == self.DEVICE_VID and port.pid == self.DEVICE_PID:
+                        is_connected = True
+                        print(f"找到设备串口: {port.device}")
+                        break
+
+            # 如果状态发生变化，发送信号
+            if is_connected != self._last_connected_state:
+                self._last_connected_state = is_connected
+                self.status_changed.emit(is_connected)
+                print(f"设备状态更新: {'已连接' if is_connected else '未连接'}")
+
+                # 如果设备已连接，尝试枚举设备
+                if is_connected:
+                    self.enum_devices()
+                else:
+                    # 设备已断开，清空设备列表
+                    self.devices = []
+                    self.current_device = None
+                    self.device_count = 0
+        except Exception as e:
+            print(f"检查设备状态失败: {str(e)}")
+            # 发生错误，认为设备未连接
+            if self._last_connected_state:
+                self._last_connected_state = False
+                self.status_changed.emit(False)
 
     def enum_devices(self):
         """枚举功耗分析仪设备"""
@@ -105,10 +158,15 @@ class MpaController:
             # 调用枚举设备方法
             device_count = self.enum_devices()
 
+            # 搜索完成后发送状态信号
+            self.status_changed.emit(device_count > 0)
+
             # 返回找到的设备数量
             return device_count
 
         except Exception as e:
+            # 发送失败信号
+            self.status_changed.emit(False)
             # 记录错误日志
             print(f"搜索设备失败: {str(e)}")
             # 抛出异常
@@ -151,7 +209,6 @@ class MpaController:
     def _callback_wrapper_func(self, user, id, what, param1, param2):
         """回调包装函数"""
         # 只处理数据接收事件
-        #print(f"回调: user={user}, id={id}, what={what}, param1={param1}, param2={param2}")
         if what != self.EVENT_DATA_RECEIVED:
             return 0
 
@@ -170,8 +227,6 @@ class MpaController:
 
             avg_voltage = total_voltage / sample_count if sample_count > 0 else 0
             avg_current = total_current / sample_count if sample_count > 0 else 0
-            # 打印平均值
-            #print(f"电压: {avg_voltage:.2f} V, 电流: {avg_current:.6f} mA")
 
             # 调用用户回调
             if self.user_callback:
@@ -181,7 +236,6 @@ class MpaController:
         except Exception as e:
             print(f"回调处理失败: {str(e)}")
             return 0
-
 
     def start(self, voltage=3.3):
         """启动采样并设置电压"""
@@ -235,7 +289,6 @@ class MpaController:
             print(f"设置电压异常: {str(e)}")
             raise Exception(f"设置电压失败: {str(e)}")
 
-
     def get_data(self):
         """
         获取功耗分析仪的电压和电流数据
@@ -266,3 +319,40 @@ class MpaController:
 
         # 返回电压和电流值
         return voltage.value, current.value
+
+    def _on_device_added(self, vid, pid, model):
+        """处理设备插入事件"""
+        try:
+            print(f"功耗分析仪设备已插入: VID={vid}, PID={pid}, 模型={model}")
+            # 枚举设备
+            self.enum_devices()
+            # 发送状态变化信号
+            if not self._last_connected_state:
+                self._last_connected_state = True
+                self.status_changed.emit(True)
+        except Exception as e:
+            print(f"处理设备插入事件失败: {str(e)}")
+
+    def _on_device_removed(self, vid, pid, model):
+        """处理设备移除事件"""
+        try:
+            print(f"功耗分析仪设备已移除: VID={vid}, PID={pid}, 模型={model}")
+            # 清空设备列表
+            self.devices = []
+            self.current_device = None
+            self.device_count = 0
+            # 发送状态变化信号
+            if self._last_connected_state:
+                self._last_connected_state = False
+                self.status_changed.emit(False)
+        except Exception as e:
+            print(f"处理设备移除事件失败: {str(e)}")
+
+    def __del__(self):
+        """析构函数"""
+        try:
+            # 停止USB监控
+            if hasattr(self, 'usb_monitor'):
+                self.usb_monitor.stop()
+        except Exception as e:
+            print(f"清理资源失败: {str(e)}")

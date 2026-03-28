@@ -30,7 +30,8 @@ from PyQt5.QtGui import QFont, QColor, QBrush, QIcon, QTextCursor
 from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
 from core.relay_controller import RelayController, RelayMonitorThread
-from core.power_analyzer_controller import PowerAnalyzerController, PowerAnalyzerMonitorThread
+#from core.power_analyzer_controller import PowerAnalyzerController, PowerAnalyzerMonitorThread
+from core.mpa_controller import MpaController
 from core.device_monitor import DeviceMonitor
 from core.tester import SerialTester
 
@@ -119,7 +120,8 @@ class MainWindow(QMainWindow):
         self.nav_buttons_list = []
         self.nav_buttons_dict = {}
         self.relay_controller = RelayController()
-        self.power_analyzer_controller = PowerAnalyzerController()
+        self.mpa_controller = MpaController()
+        #self.power_analyzer_controller = PowerAnalyzerController()
         self.test_thread = None
         self.device_monitor = None
         self.test_data = None
@@ -163,7 +165,7 @@ class MainWindow(QMainWindow):
         self.create_status_bar()
 
         # 启动继电器监控线程
-        self.start_relay_monitor()
+        #self.start_relay_monitor()
 
         # 连接继电器状态变化信号
         self.relay_controller.status_changed.connect(self.on_power_status_changed)
@@ -172,6 +174,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'relay_on_btn') and hasattr(self, 'relay_off_btn'):
             self.relay_on_btn.setEnabled(False)
             self.relay_off_btn.setEnabled(False)
+
+        # 添加设备状态标记
+        self.power_analyzer_found = False  # 是否已找到功耗分析仪
+        self.power_analyzer_connected = False  # 设备当前连接状态
+
+        # 连接功耗分析仪状态变化信号
+        if hasattr(self, 'power_analysis_page') and hasattr(self.power_analysis_page, 'mpa_controller'):
+            self.power_analysis_page.mpa_controller.status_changed.connect(self._on_power_analyzer_status_changed)
 
     def _init_connections(self):
         """初始化信号槽连接"""
@@ -389,6 +399,7 @@ class MainWindow(QMainWindow):
     def show_power_analysis_page(self):
         self.stacked_widget.setCurrentWidget(self.power_analysis_page)
         self.update_nav_buttons(self.show_power_analysis_page)
+        self.power_analysis_page.monitoring_tab.search_power_analyzer()
 
     def show_oscilloscope_page(self):
         """显示虚拟示波器页面"""
@@ -497,490 +508,6 @@ class MainWindow(QMainWindow):
             self.power_status_label.setText("🔋 设备电源: 断电")
             self.power_status_label.setStyleSheet("color: #909399; font-size: 9pt;")
             Logger.log("设备电源状态: 断电", "INFO", self.log_text)
-
-    # ====== 设备初始化 ======
-    def initialize_device(self):
-        """初始化设备"""
-        if not self.relay_controller.is_open:
-            QMessageBox.warning(self, "警告", "请先连接继电器！")
-            return
-
-        # 创建临时监控线程进行设备初始化
-        self.device_monitor = DeviceMonitor()
-        port_name = self.port_combo.currentData()
-        if not port_name:
-            CustomMessageBox("警告", "请选择设备串口", "warning", self).exec_()
-            return
-
-        self.device_monitor.set_serial_port(port_name, int(self.baudrate_combo.currentText()))
-        self.device_monitor.set_relay_controller(self.relay_controller)
-        self.device_monitor.set_monitor_config(self.monitor_command_edit.text(), self.expected_response_edit.text())
-
-        # 设置配置
-        self.device_monitor.set_config('boot_delay', self.boot_delay_spin.value())
-        self.device_monitor.set_config('power_off_delay', self.power_off_delay_spin.value())
-
-        def on_update(message, level):
-            Logger.log(message, level, self.log_text)
-
-        def on_ready():
-            Logger.log("设备初始化成功", "SUCCESS", self.log_text)
-            self.device_status_label.setText("🟢 设备状态: 正常运行")
-            self.device_monitor.stop()
-
-        def on_failed():
-            Logger.log("设备初始化失败", "ERROR", self.log_text)
-            self.device_status_label.setText("🔴 设备状态: 初始化失败")
-            self.device_monitor.stop()
-
-        # 连接信号
-        self.device_monitor.update_signal.connect(on_update)
-        self.device_monitor.device_ready.connect(on_ready)
-        self.device_monitor.device_dead.connect(lambda: self.device_status_label.setText("🔴 设备状态: 死机"))
-
-        # 启动初始化
-        self.device_monitor.start()
-        Logger.log("开始初始化设备...", "INFO", self.log_text)
-        self.device_status_label.setText("🟡 设备状态: 初始化中")
-
-    # ====== 测试脚本相关方法 ======
-    def browse_script(self):
-        """浏览测试脚本"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择测试脚本", "",
-            "Excel文件 (*.xlsx *.xls);;CSV文件 (*.csv);;所有文件 (*.*)"
-        )
-
-        if file_path:
-            self.script_path.setText(file_path)
-            try:
-                if file_path.endswith('.csv'):
-                    self.test_data = pd.read_csv(file_path)
-                else:
-                    self.test_data = pd.read_excel(file_path)
-
-                # 更新脚本信息
-                self.test_case_count.setText(f"测试用例: {len(self.test_data)}")
-
-                # 计算平均超时
-                if 'Timeout' in self.test_data.columns:
-                    avg_timeout = self.test_data['Timeout'].mean()
-                    self.script_timeout_info.setText(f"平均超时: {int(avg_timeout)}ms")
-
-                # 预览
-                preview_text = f"脚本: {os.path.basename(file_path)}\n"
-                preview_text += f"命令数: {len(self.test_data)}\n"
-                preview_text += f"列: {', '.join(self.test_data.columns.tolist())}"
-
-                self.script_preview.setText(preview_text)
-
-                Logger.log(f"已加载脚本: {file_path}，共 {len(self.test_data)} 条测试用例", "SUCCESS", self.log_text)
-
-            except Exception as e:
-                CustomMessageBox("错误", f"加载脚本失败: {str(e)}", "error", self).exec_()
-                self.script_preview.setText(f"加载失败: {str(e)}")
-
-    def show_at_command_library(self):
-        """显示AT命令库"""
-        dialog = ATCommandLibraryDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
-            selected = dialog.get_selected_command()
-            if selected:
-                cmd, expected = selected
-                # 将命令添加到日志显示
-                self.log_text.append(f'<span style="color:#4CAF50">[AT命令库] 选择: {cmd} → {expected}</span>')
-
-    def generate_test_case(self):
-        """生成测试用例模板"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "保存测试用例模板", "",
-            "Excel文件 (*.xlsx);;CSV文件 (*.csv)"
-        )
-
-        if file_path:
-            try:
-                # 创建示例数据
-                sample_data = {
-                    'Command': ['AT', 'ATI', 'AT+CGMI', 'AT+CGMR', 'AT+CSQ', 'AT+COPS?'],
-                    'Expected Response': ['OK', 'Manufacturer: Example', 'Model: Example', 'Revision: 1.0', 
-                                          '+CSQ: 15,99', '+COPS: 0,0,"CHINA MOBILE"'],
-                    'Timeout': [1000, 1000, 1000, 1000, 1000, 1000],
-                    'Stop on Fail': [True, True, False, False, True, False]
-                }
-
-                df = pd.DataFrame(sample_data)
-
-                if file_path.endswith('.csv'):
-                    df.to_csv(file_path, index=False, encoding='utf-8-sig')
-                else:
-                    df.to_excel(file_path, index=False)
-
-                CustomMessageBox("成功", f"测试用例模板已生成: {file_path}", "info", self).exec_()
-                self.script_path.setText(file_path)
-                self.test_data = df
-
-                # 预览模板
-                preview_text = f"模板文件: {os.path.basename(file_path)}\n\n"
-                preview_text += "模板内容:\n"
-                for i, row in df.iterrows():
-                    preview_text += f"行{i+1}: {row.to_dict()}\n"
-
-                self.script_preview.setText(preview_text)
-
-            except Exception as e:
-                CustomMessageBox("错误", f"生成模板失败: {str(e)}", "error", self).exec_()
-
-    # ====== 测试控制相关方法 ======
-    def start_test(self):
-        """开始测试"""
-        # 检查必要配置
-        if not hasattr(self, 'test_data') or self.test_data is None:
-            CustomMessageBox("警告", "请先选择测试脚本", "warning", self).exec_()
-            return
-
-        # 检查串口是否已连接
-        if not hasattr(self, 'serial_port') or not self.serial_port or not self.serial_port.is_open:
-            CustomMessageBox("警告", "请先连接设备串口", "warning", self).exec_()
-            return
-
-        # 重置统计
-        self.test_start_time = datetime.now()
-        self.total_commands = 0
-        self.passed_commands = 0
-        self.failed_commands = 0
-        self.error_commands = 0
-        self.last_update_time = time.time()
-        self._last_command_count = 0
-
-        # 清空结果
-        self.realtime_table.setRowCount(0)
-        self.command_table.setRowCount(0)
-        self.crash_table.setRowCount(0)
-        self.results_widget.table.setRowCount(0)
-        self.results.clear()
-
-        # 更新状态
-        self.test_status_label.setText("▶ 测试状态: 运行中")
-        self.test_status_label.setStyleSheet("color: #67c23a; font-weight: bold;")
-
-        # 更新按钮状态
-        self.start_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.pause_btn.setEnabled(True)
-        self.init_device_btn.setEnabled(False)
-        self.serial_btn.setEnabled(False)
-        self.export_btn.setEnabled(False)
-
-        # 创建测试线程
-        self.test_thread = SerialTester()
-        self.test_thread.set_serial_port(self.serial_port)
-        self.test_thread.set_test_data(self.test_data)
-        self.test_thread.set_global_loop_count(self.loop_count_spin.value())
-        self.test_thread.set_test_duration(self.test_duration_spin.value())
-
-        # 设置配置
-        self.test_thread.set_config('retry_on_fail', self.retry_count_spin.value())
-        self.test_thread.set_config('command_delay', self.command_delay_spin.value() / 1000.0)
-        self.test_thread.set_config('response_timeout', self.response_timeout_spin.value() / 1000.0)
-        self.test_thread.set_config('stop_on_fail', self.stop_on_fail_check.isChecked())
-
-        # 初始化日志
-        port_name = self.serial_port.port if self.serial_port else "unknown"
-        script_path = self.script_path.text()
-        self.test_thread.init_log_file(script_path, port_name)
-
-        # 连接信号
-        self.test_thread.update_signal.connect(self.update_log)
-        self.test_thread.progress_signal.connect(self.progress_bar.setValue)
-        self.test_thread.finished_signal.connect(self.test_finished)
-        self.test_thread.statistics_signal.connect(self.update_statistics)
-        self.test_thread.test_result_signal.connect(self.add_test_result)
-
-        # 创建设备监控（如果启用）
-        if self.auto_recovery_check.isChecked():
-            monitor_command = self.monitor_command_edit.text().strip()
-            if monitor_command:
-                if not hasattr(self, 'device_monitor') or not self.device_monitor:
-                    self.device_monitor = DeviceMonitor()
-
-                # 设置跳过初始化标志
-                self.device_monitor.set_skip_initialization(True)
-
-                self.device_monitor.set_serial_port(self.serial_port.port, int(self.baudrate_combo.currentText()))
-                self.device_monitor.set_relay_controller(self.relay_controller)
-                self.device_monitor.set_monitor_config(monitor_command, self.expected_response_edit.text())
-                self.device_monitor.check_interval = self.monitor_interval_spin.value()
-                self.device_monitor.max_retries = self.max_recovery_retries_spin.value()
-
-                # 设置配置
-                self.device_monitor.set_config('boot_delay', self.boot_delay_spin.value())
-                self.device_monitor.set_config('power_off_delay', self.power_off_delay_spin.value())
-
-                # 连接监控信号
-                self.device_monitor.update_signal.connect(self.update_log)
-                self.device_monitor.device_ready.connect(self.test_thread.on_device_ready)
-                self.device_monitor.device_dead.connect(self.test_thread.on_device_dead)
-                self.device_monitor.recovery_complete.connect(self.test_thread.on_recovery_complete)
-                self.device_monitor.device_crash.connect(self.add_crash_record)
-                self.device_monitor.statistics_update.connect(self.update_statistics)
-                self.device_monitor.serial_port_changed.connect(self.test_thread.update_serial_port)
-
-                # 设置到测试线程
-                self.test_thread.device_monitor = self.device_monitor
-
-                # 启动监控
-                self.device_monitor.start()
-                self.monitor_status_label.setText("🟢 监控状态: 运行中")
-                Logger.log("设备监控已启动", "INFO", self.log_text)
-            else:
-                Logger.log("自动恢复已启用但监控命令为空，跳过设备监控", "WARNING", self.log_text)
-                self.test_thread.device_ready = True
-        else:
-            self.test_thread.device_ready = True
-
-        # 启动测试
-        self.test_thread.start()
-        Logger.log("测试开始...", "SUCCESS", self.log_text)
-
-    def pause_test(self):
-        """暂停/继续测试"""
-        if self.test_thread:
-            if self.test_thread.pause_flag:
-                self.test_thread.resume()
-                self.pause_btn.setText("⏸ 暂停")
-                self.test_status_label.setText("▶ 测试状态: 运行中")
-                self.test_status_label.setStyleSheet("color: #67c23a; font-weight: bold;")
-            else:
-                self.test_thread.pause()
-                self.pause_btn.setText("▶ 继续")
-                self.test_status_label.setText("⏸ 测试状态: 已暂停")
-                self.test_status_label.setStyleSheet("color: #e6a23c; font-weight: bold;")
-
-    def stop_test(self):
-        """停止测试"""
-        if self.test_thread and self.test_thread.isRunning():
-            reply = QMessageBox.question(
-                self, "确认停止",
-                "确定要停止测试吗？",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                self.test_thread.stop()
-                Logger.log("正在停止测试...", "WARNING", self.log_text)
-
-                if self.device_monitor:
-                    self.device_monitor.stop()
-
-    def test_finished(self, success):
-        """测试完成回调"""
-        # 更新按钮状态
-        self.start_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.pause_btn.setEnabled(False)
-        self.init_device_btn.setEnabled(True)
-        self.serial_btn.setEnabled(True)
-        self.export_btn.setEnabled(True)
-        self.pause_btn.setText("⏸ 暂停")
-
-        # 更新状态
-        if success:
-            self.test_status_label.setText("✅ 测试状态: 完成")
-            self.test_status_label.setStyleSheet("color: #67c23a; font-weight: bold;")
-            Logger.log("测试正常完成", "SUCCESS", self.log_text)
-        else:
-            self.test_status_label.setText("❌ 测试状态: 中止")
-            self.test_status_label.setStyleSheet("color: #f56c6c; font-weight: bold;")
-            Logger.log("测试被中止", "WARNING", self.log_text)
-
-        # 停止监控
-        if self.device_monitor:
-            self.device_monitor.stop()
-            self.monitor_status_label.setText("🔴 监控状态: 已停止")
-
-        # 更新进度条
-        self.progress_bar.setValue(100)
-        self.progress_label.setText("100%")
-
-    # ====== 结果处理相关方法 ======
-    def add_test_result(self, result):
-        """添加测试结果"""
-        # 添加到详细结果
-        self.results_widget.add_result(result)
-        self.results.append(result)
-
-        # 更新统计
-        self.total_commands += 1
-        if result['Result'] == 'Pass':
-            self.passed_commands += 1
-        elif result['Result'] == 'Fail':
-            self.failed_commands += 1
-        else:
-            self.error_commands += 1
-
-        # 更新实时显示
-        self.pass_count_label.setText(f"✅ 通过: {self.passed_commands}")
-        self.fail_count_label.setText(f"❌ 失败: {self.failed_commands}")
-        self.error_count_label.setText(f"⚠️ 错误: {self.error_commands}")
-        self.total_count_label.setText(f"📊 总数: {self.total_commands}")
-
-        if 'Loop' in result:
-            self.current_loop_label.setText(f"🔄 当前循环: {result['Loop']}")
-        if 'Command' in result:
-            cmd = result['Command']
-            self.current_command_label.setText(f"📝 当前命令: {cmd[:20]}{'...' if len(cmd) > 20 else ''}")
-
-        # 更新实时结果表格
-        self.add_realtime_result(result)
-
-        # 更新命令统计
-        self.update_command_stats(result)
-
-        # 更新统计卡片
-        self.update_stat_cards()
-
-    def add_realtime_result(self, result):
-        """添加实时结果到表格"""
-        row = self.realtime_table.rowCount()
-        self.realtime_table.insertRow(row)
-
-        # 设置颜色
-        if result['Result'] == 'Pass':
-            color = QColor(220, 255, 220)
-        elif result['Result'] == 'Fail':
-            color = QColor(255, 220, 220)
-        else:
-            color = QColor(255, 255, 200)
-
-        # 填充数据
-        items = [
-            result.get('Timestamp', ''),
-            result.get('Command', '')[:30],
-            result.get('Result', ''),
-            f"{result.get('ExecutionTime', 0)*1000:.1f}ms",
-            result.get('Expected Response', '')[:30],
-            result.get('Actual Response', '')[:50]
-        ]
-
-        for col, text in enumerate(items):
-            item = QTableWidgetItem(text)
-            item.setBackground(color)
-            self.realtime_table.setItem(row, col, item)
-
-        # 限制行数
-        if row > 100:
-            self.realtime_table.removeRow(0)
-
-        # 自动滚动
-        self.realtime_table.scrollToBottom()
-
-    def add_crash_record(self, crash_info):
-        """添加死机记录"""
-        row = self.crash_table.rowCount()
-        self.crash_table.insertRow(row)
-
-        # 添加记录到列表
-        self.crash_records.append({
-            'time': datetime.now(),
-            'info': crash_info,
-            'attempts': 0,
-            'recovered': False
-        })
-
-        # 更新表格
-        self.crash_table.setItem(row, 0, QTableWidgetItem(datetime.now().strftime('%H:%M:%S')))
-        self.crash_table.setItem(row, 1, QTableWidgetItem(crash_info))
-        self.crash_table.setItem(row, 2, QTableWidgetItem("0"))
-        self.crash_table.setItem(row, 3, QTableWidgetItem("等待恢复"))
-
-        # 更新状态显示
-        self.device_status_label.setText("🔴 设备状态: 死机恢复中")
-        self.crash_count_label.setText(f"💥 死机次数: {len(self.crash_records)}")
-        self.last_crash_label.setText(f"⏰ 最后死机: {datetime.now().strftime('%H:%M:%S')}")
-
-        # 滚动到底部
-        self.crash_table.scrollToBottom()
-
-    def update_crash_recovery(self, success):
-        """更新死机恢复状态"""
-        if self.crash_records:
-            last_crash = self.crash_records[-1]
-            last_crash['attempts'] += 1
-            last_crash['recovered'] = success
-
-            # 更新表格最后一行
-            row = self.crash_table.rowCount() - 1
-            if row >= 0:
-                self.crash_table.item(row, 2).setText(str(last_crash['attempts']))
-                status = "✅ 恢复成功" if success else "❌ 恢复失败"
-                self.crash_table.item(row, 3).setText(status)
-
-                if success:
-                    self.device_status_label.setText("🟢 设备状态: 正常运行")
-
-                    # 计算恢复成功率
-                    recovered_count = sum(1 for c in self.crash_records if c.get('recovered', False))
-                    recovery_rate = (recovered_count / len(self.crash_records) * 100) if self.crash_records else 0
-                    self.recovery_count_label.setText(f"🔄 恢复次数: {len(self.crash_records)}")
-                    self.success_rate_label.setText(f"📈 恢复成功率: {recovery_rate:.1f}%")
-                else:
-                    self.device_status_label.setText("🔴 设备状态: 恢复失败")
-
-    def update_command_stats(self, result):
-        """更新命令统计"""
-        command = result['Command']
-
-        # 查找命令
-        found = False
-        for row in range(self.command_table.rowCount()):
-            if self.command_table.item(row, 0).text() == command:
-                total = int(self.command_table.item(row, 1).text()) + 1
-                success = int(self.command_table.item(row, 2).text())
-                fail = int(self.command_table.item(row, 3).text())
-
-                if result['Result'] == 'Pass':
-                    success += 1
-                else:
-                    fail += 1
-
-                rate = (success / total * 100) if total > 0 else 0
-
-                self.command_table.item(row, 1).setText(str(total))
-                self.command_table.item(row, 2).setText(str(success))
-                self.command_table.item(row, 3).setText(str(fail))
-                self.command_table.item(row, 4).setText(f"{rate:.1f}%")
-                found = True
-                break
-
-        if not found:
-            row = self.command_table.rowCount()
-            self.command_table.insertRow(row)
-
-            total = 1
-            success = 1 if result['Result'] == 'Pass' else 0
-            fail = 0 if result['Result'] == 'Pass' else 1
-            rate = (success / total * 100) if total > 0 else 0
-
-            self.command_table.setItem(row, 0, QTableWidgetItem(command))
-            self.command_table.setItem(row, 1, QTableWidgetItem(str(total)))
-            self.command_table.setItem(row, 2, QTableWidgetItem(str(success)))
-            self.command_table.setItem(row, 3, QTableWidgetItem(str(fail)))
-            self.command_table.setItem(row, 4, QTableWidgetItem(f"{rate:.1f}%"))
-
-    def update_stat_cards(self):
-        """更新统计卡片"""
-        if self.total_commands > 0:
-            # 计算通过率
-            pass_rate = (self.passed_commands / self.total_commands * 100)
-            fail_rate = (self.failed_commands / self.total_commands * 100)
-
-            # 更新卡片
-            self.stat_cards[0].setText(str(self.total_commands))
-            self.stat_cards[1].setText(f"{pass_rate:.1f}%")
-            self.stat_cards[3].setText(f"{fail_rate:.1f}%")
-
-            # 更新总循环数（如果有循环信息）
-            if hasattr(self, 'test_thread') and self.test_thread:
-                self.stat_cards[5].setText(str(self.test_thread.current_loop))
 
     # ====== 日志相关方法 ======
     def update_log(self, message, level="INFO"):
@@ -1496,3 +1023,23 @@ class MainWindow(QMainWindow):
                 self.update_timer.timeout.disconnect()
             except Exception:
                 pass
+
+    def _on_power_analyzer_status_changed(self, connected: bool):
+        """功耗分析仪状态变化处理"""
+        self.power_analyzer_connected = connected
+
+        if connected:
+            self.power_analyzer_found = True
+            self.power_analyzer_label.setText("📉 功耗分析仪: 已连接")
+            self.power_analyzer_label.setStyleSheet("color: #67c23a; font-size: 9pt;")
+        else:
+            self.power_analyzer_label.setText("📉 功耗分析仪: 已断开")
+            self.power_analyzer_label.setStyleSheet("color: #f56c6c; font-size: 9pt;")
+
+    def show_power_analysis_page(self):
+        self.stacked_widget.setCurrentWidget(self.power_analysis_page)
+        self.update_nav_buttons(self.show_power_analysis_page)
+
+        # 只在未找到设备时才搜索
+        if not self.power_analyzer_found:
+            self.power_analysis_page.monitoring_tab.search_power_analyzer()

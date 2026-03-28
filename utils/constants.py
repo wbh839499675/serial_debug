@@ -69,6 +69,86 @@ FONTS = {
     }
 }
 
+# 功耗分析页面样式
+UI_POWER_ANALYSIS = {
+    'GROUP_STYLE': """
+        QGroupBox {
+            font-weight: bold;
+            border: 1px solid #dcdfe6;
+            border-radius: 5px;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 10px;
+            padding: 0 5px;
+        }
+    """,
+    'BUTTON_STYLES': {
+        'connect': """
+            QPushButton {
+                background-color: #409eff;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #66b1ff;
+            }
+            QPushButton:pressed {
+                background-color: #3a8ee6;
+            }
+        """,
+        'start': """
+            QPushButton {
+                background-color: #67c23a;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #85ce61;
+            }
+            QPushButton:pressed {
+                background-color: #5daf34;
+            }
+        """,
+        'stop': """
+            QPushButton {
+                background-color: #f56c6c;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f78989;
+            }
+            QPushButton:pressed {
+                background-color: #dd6161;
+            }
+        """,
+        'default': """
+            QPushButton {
+                background-color: #909399;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #a6a9ad;
+            }
+            QPushButton:pressed {
+                background-color: #82848a;
+            }
+        """
+    }
+}
+
 # GroupBox 样式配置
 GROUP_STYLES = {
     'default': {
