@@ -286,49 +286,13 @@ class SerialDebugTabEvents:
         # 发送数据
         success = self.tab.serial_controller.send_data(data_bytes)
         # 显示发送的数据到接收区
-        self._display_sent_data(data, data_bytes)
+        self.tab._on_data_sent(data_bytes)
+
         if success:
             Logger.log(f"发送数据成功: {data}", "INFO")
         else:
             Logger.log(f"发送数据失败: {data}", "ERROR")
             CustomMessageBox("错误", "发送数据失败！", "error", self.tab).exec_()
-
-    def _display_sent_data(self, data: str, data_bytes: bytes):
-        """显示发送的数据到接收区
-
-        Args:
-            data: 原始文本数据
-            data_bytes: 转换后的字节数据
-        """
-        if not hasattr(self.tab, 'recv_text') or not self.tab.recv_text:
-            print("显示发送数据时接收区不存在")
-            return
-
-        try:
-            # 格式化发送数据（添加发送标识）
-            display_data = data
-            if hasattr(self.tab, 'timestamp_recv_check') and self.tab.timestamp_recv_check.isChecked():
-                timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-                display_data = f'[{timestamp}]发送→◇{display_data}'
-
-            # 如果是十六进制发送，转换为十六进制显示
-            if self.tab.hex_send_check.isChecked():
-                display_data = data_bytes.hex(' ').upper()
-
-            # 显示文本
-            cursor = self.tab.recv_text.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            cursor.insertText(display_data + '\n')
-            self.tab.recv_text.setTextCursor(cursor)
-
-            # 自动滚动
-            if hasattr(self.tab, 'auto_scroll_check') and self.tab.auto_scroll_check.isChecked():
-                cursor = self.tab.recv_text.textCursor()
-                cursor.movePosition(QTextCursor.End)
-                self.tab.recv_text.setTextCursor(cursor)
-
-        except Exception as e:
-            Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')
 
     def on_clear_send(self):
         """清空发送数据"""

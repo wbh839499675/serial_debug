@@ -1845,7 +1845,7 @@ class AudioTestTab(QWidget):
 
         try:
             # 发送初始化命令
-            self.serial_controller.write("AT+QAUDCH?")
+            self.serial_controller.send_data("AT+QAUDCH?")
             response = self.serial_controller.read_response()
             self.log_signal.emit(f"TX: AT+QAUDCH?", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -1904,7 +1904,7 @@ class AudioTestTab(QWidget):
 
             # 发送音频通道设置命令
             """
-            #self.serial_controller.write(f"AT+CAUDSW={channel}")
+            #self.serial_controller.send_data(f"AT+CAUDSW={channel}")
             response = self.serial_controller.read_response()
             self.log_signal.emit(f"TX: AT+CAUDSW={channel}", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -1928,7 +1928,7 @@ class AudioTestTab(QWidget):
             """
             # 发送麦克风增益设置命令
             mic_gain = self.mic_gain_slider.value()
-            #self.serial_controller.write(f"AT+QMIC={channel},{mic_gain}")
+            #self.serial_controller.send_data(f"AT+QMIC={channel},{mic_gain}")
             response = self.serial_controller.read_response()
             self.log_signal.emit(f"TX: AT+QMIC={channel},{mic_gain}", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -1940,13 +1940,13 @@ class AudioTestTab(QWidget):
             # 发送侧音设置命令
             if self.sidetone_check.isChecked():
                 sidetone_gain = self.sidetone_gain_slider.value()
-                #self.serial_controller.write(f"AT+QSIDET={sidetone_gain}")
+                #self.serial_controller.send_data(f"AT+QSIDET={sidetone_gain}")
                 response = self.serial_controller.read_response()
                 self.log_signal.emit(f"TX: AT+QSIDET={sidetone_gain}", "TX")
                 self.log_signal.emit(f"RX: {response}", "RX")
                 self.log_signal.emit(f"侧音已启用，增益设置为: {sidetone_gain}", "INFO")
             else:
-                #self.serial_controller.write("AT+QSIDET=0")
+                #self.serial_controller.send_data("AT+QSIDET=0")
                 response = self.serial_controller.read_response()
                 self.log_signal.emit(f"TX: AT+QSIDET=0", "TX")
                 self.log_signal.emit(f"RX: {response}", "RX")
@@ -2225,11 +2225,11 @@ class AudioTestTab(QWidget):
 
         try:
             # 先清空缓冲区
-            #self.serial_controller.clear_buffers()
-            #time.sleep(0.1)
+            self.serial_controller.clear_buffers()
+            time.sleep(0.1)
 
             # 发送查询文件列表命令
-            response = self.serial_controller.write_and_read(f'AT+QFLST=\"*\"\r\n', 3.0)
+            response = self.serial_controller.write_and_read(f'AT+QFLST=\"*\"\r\n', 300)
             self.log_signal.emit("TX: QFLST=\"*\"", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2313,8 +2313,7 @@ class AudioTestTab(QWidget):
 
             # 发送播放命令
             #AUDPLAY: (1-4),<file_name>
-            self.serial_controller.write(f'AT+CAUDPLAY=1,"{filename}"\r\n')
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read(f'AT+CAUDPLAY=1,"{filename}"\r\n', 300)
             self.log_signal.emit(f'TX: AT+CAUDPLAY=1,"{filename}"', "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2348,7 +2347,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送暂停播放命令
-            self.serial_controller.write("AT+CAUDPLAY=2\r\n")
+            self.serial_controller.send_data("AT+CAUDPLAY=2\r\n")
             response = self.serial_controller.read_response()
             self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -2381,7 +2380,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送恢复播放命令
-            self.serial_controller.write("AT+CAUDPLAY=3\r\n")
+            self.serial_controller.send_data("AT+CAUDPLAY=3\r\n")
             response = self.serial_controller.read_response()
             self.log_signal.emit("TX: AT+CAUDPLAY=3", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -2414,7 +2413,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送停止播放命令
-            self.serial_controller.write("AT+CAUDPLAY=0")
+            self.serial_controller.send_data("AT+CAUDPLAY=0")
             response = self.serial_controller.read_response()
             self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
@@ -2520,9 +2519,9 @@ class AudioTestTab(QWidget):
 
             while (time.time() - start_time) < timeout:
                 # 检查是否有数据可读
-                if self.serial_controller.serial_port.in_waiting > 0:
+                if self.serial_controller.serial_port.waitForReadyRead(100):
                     # 读取可用数据
-                    data = self.serial_controller.serial_port.read(self.serial_controller.serial_port.in_waiting)
+                    data = self.serial_controller.serial_port.readAll()
                     if data:
                         response += data.decode('utf-8', errors='ignore')
 
@@ -2575,7 +2574,7 @@ class AudioTestTab(QWidget):
             #time.sleep(0.1)
 
             # 发送下载命令
-            self.serial_controller.write(f'AT+QFDWL="{filename}"\r\n')
+            self.serial_controller.send_data(f'AT+QFDWL="{filename}"\r\n')
             self.log_signal.emit(f'TX: AT+QFDWL="{filename}"', "TX")
 
             # 等待CONNECT响应
@@ -2584,10 +2583,8 @@ class AudioTestTab(QWidget):
             timeout = 3.0
 
             while (time.time() - start_time) < timeout:
-                if self.serial_controller.serial_port.in_waiting > 0:
-                    data = self.serial_controller.serial_port.read(
-                        self.serial_controller.serial_port.in_waiting
-                    )
+                if self.serial_controller.serial_port.waitForReadyRead(100):
+                    data = self.serial_controller.serial_port.readAll()
                     response += data.decode('utf-8', errors='ignore')
                     if 'CONNECT' in response or 'ERROR' in response:
                         break
@@ -2711,8 +2708,7 @@ class AudioTestTab(QWidget):
                 time.sleep(0.1)
 
                 # 发送重命名文件命令
-                self.serial_controller.write(f'AT+QFRENAME="{old_filename}","{new_filename}"')
-                response = self.serial_controller.read_response()
+                response = self.serial_controller.write_and_read(f'AT+QFRENAME="{old_filename}","{new_filename}"', 300)
                 self.log_signal.emit(f'TX: AT+QFRENAME="{old_filename}","{new_filename}"', "TX")
                 self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2853,8 +2849,7 @@ class AudioTestTab(QWidget):
             time.sleep(0.1)
 
             # 发送TTS播放命令
-            self.serial_controller.write(f'AT+CTTS=1,"{text}"\r\n')
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write(f'AT+CTTS=1,"{text}"\r\n', 300)
             self.log_signal.emit(f'TX: AT+CTTS=1,"{text}"', "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -3148,7 +3143,7 @@ class AudioTestTab(QWidget):
                 # 解析模块型号，通常在第二行
                 lines = response.split('\n')
                 if len(lines) > 1:
-                    self.model_label.setText(lines[1].strip())
+                    self.model_label.setText(lines[2].strip())
 
             # 读取固件版本
             response = self.serial_controller.write_and_read("AT+SGSW\r\n", 0.3)
@@ -3178,9 +3173,9 @@ class AudioTestTab(QWidget):
             response = self.serial_controller.write_and_read("AT+SFHW\r\n", 0.3)
             if response:
                 # 解析硬件版本
-                match = re.search(r'HardwareVersion:(\S+)', response)
+                match = re.search(r'HardwareVersion: (\S+)', response)
                 if match:
-                    self.hardware_label.setText(match.group(1))
+                    self.hardware_label.setText(match.group(0))
 
             self.log_signal.emit("模块信息已刷新", "INFO")
         except Exception as e:

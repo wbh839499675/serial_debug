@@ -581,11 +581,11 @@ class ConfigTab(QWidget):
             # 如果串口已连接，则重新连接以应用新配置
             if self.serial_controller and self.serial_controller.is_connected:
                 # 先断开连接
-                self.serial_controller.close_port()
+                self.serial_controller.disconnect_port()
                 # 使用新配置重新连接
                 port_name = self.port_combo.currentData()
                 if port_name:
-                    self.serial_controller.open_port(port_name, dialog.baudrate)
+                    self.serial_controller.connect_port(port_name, dialog.baudrate)
                     Logger.info(f"串口参数已更新并重新连接: 波特率={dialog.baudrate}", module='serial')
             else:
                 Logger.info(f"串口参数已更新: 波特率={dialog.baudrate}", module='serial')
@@ -682,7 +682,7 @@ class ConfigTab(QWidget):
 
         # 连接串口
         if self.serial_controller:
-            success = self.serial_controller.open_port(port_name, baudrate)
+            success = self.serial_controller.connect_port(port_name, baudrate)
 
             if success:
                 self.serial_status_indicator.setStyleSheet("color: #67c23a; font-size: 20pt;")
@@ -706,7 +706,7 @@ class ConfigTab(QWidget):
 
         # 断开串口
         if self.serial_controller:
-            success = self.serial_controller.close_port()
+            success = self.serial_controller.disconnect_port()
 
             if success:
                 self.serial_status_indicator.setStyleSheet("color: #dcdfe6; font-size: 20pt;")
@@ -725,20 +725,14 @@ class ConfigTab(QWidget):
     def on_serial_connected(self, connected):
         """串口连接状态变化处理"""
         if connected:
-            # 启动数据监控
-            if not self.serial_monitor:
-                self.serial_monitor = SerialMonitor(self.serial_controller, self.data_display)
-                self.serial_monitor.set_auto_scroll(self.auto_scroll_check.isChecked())
-                self.serial_monitor.set_timestamp(self.timestamp_check.isChecked())
-                self.serial_monitor.set_hex_display(self.hex_check.isChecked())
-                self.serial_monitor.start()
+            self.serial_status_label.setText("🟢 已连接")
+            self.serial_status_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #67c23a;")
+            self.module_status_label.setText("模块: 在线")
+            self.module_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
+            self.log_signal.emit("串口已连接", "INFO")
 
-                Logger.info("数据监控已启动", module='serial')
-        else:
-            # 停止数据监控
-            if self.serial_monitor:
-                self.serial_monitor.stop()
-                Logger.info("数据监控已停止", module='serial')
+            # 自动刷新模块信息
+            self.refresh_module_info()
 
     def clear_data(self):
         """清空数据显示"""

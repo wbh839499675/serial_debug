@@ -503,11 +503,9 @@ class CommandManager(QObject):
             is_hex_send = self.hex_send_check.isChecked() if hasattr(self.hex_send_check, 'isChecked') else False
             is_add_crlf = self.add_crlf_check.isChecked() if hasattr(self.add_crlf_check, 'isChecked') else True
         except Exception as e:
-            print("----------------22222-----------------")
             self.command_send_failed.emit(f"获取配置失败: {str(e)}")
             Logger.log(f"获取配置失败: {str(e)}", "ERROR")
             return
-
 
         # 处理十六进制发送
         if is_hex_send:

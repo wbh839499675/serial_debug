@@ -13,8 +13,6 @@ from core.serial_controller import SerialController
 #from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.serial_debug_layout import SerialDebugTabLayout
 from ui.serial_debug.serial_debug_event import SerialDebugTabEvents
-from ui.serial_debug.data_receiver import DataReceiver
-from ui.serial_debug.data_sender import DataSender
 from ui.serial_debug.command_manager import CommandManager
 #from ui.serial_debug.statistics_manager import StatisticsManager
 from utils.constants import (
@@ -207,7 +205,7 @@ class SerialDebugTab(QWidget):
             return
 
         Logger.log(error_msg, "ERROR")
-        QMessageBox.warning(self, "串口错误", error_msg)
+        CustomMessageBox("串口错误", "{error_msg}", "error", self).exec_()
 
     def _on_port_removed(self, port_name: str):
         """串口移除处理"""
@@ -520,12 +518,32 @@ class SerialDebugTab(QWidget):
         if self.recv_count_label:
             self.recv_count_label.setText(f"接收字节数: {total_bytes}")
 
+    def _update_send_stats(self, byte_count: int):
+        """更新发送统计"""
+        if not hasattr(self, 'sent_count_label'):
+            print("未找到发送统计标签")
+            return
+
+        # 获取当前统计值
+        current_text = self.sent_count_label.text()
+        try:
+            current_bytes = int(current_text.split(': ')[1])
+        except (IndexError, ValueError):
+            current_bytes = 0
+            print("发送统计值无效")
+
+        # 更新统计
+        print(f"更新发送统计")
+        total_bytes = current_bytes + byte_count
+        self.sent_count_label.setText(f"发送字节数: {total_bytes}")
+
     def _update_recv_stats(self, byte_count: int):
         """更新接收统计"""
         if not hasattr(self, 'recv_count_label'):
             return
 
         # 获取当前统计值
+        print(f"更新接收统计")
         current_text = self.recv_count_label.text()
         try:
             current_bytes = int(current_text.split(': ')[1])
@@ -549,16 +567,19 @@ class SerialDebugTab(QWidget):
             return
 
         try:
+            # 更新发送统计
+            self._update_send_stats(len(data))
+
             # 转换数据为字符串
-            if isinstance(data, bytes):
-                data_str = data.decode('utf-8', errors='replace')
-            elif isinstance(data, str):
-                data_str = data
+            if self.hex_send_check.isChecked():
+                # 十六进制发送，转换为十六进制显示
+                display_data = data.hex(' ').upper()
             else:
-                data_str = str(data)
+                # 普通文本发送
+                data_str = data.decode('utf-8', errors='replace')
+                display_data = data_str
 
             # 格式化发送数据（添加发送标识）
-            display_data = data_str
             if hasattr(self, 'timestamp_recv_check') and self.timestamp_recv_check.isChecked():
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
                 display_data = f'[{timestamp}]发送→◇{display_data}'
@@ -577,6 +598,7 @@ class SerialDebugTab(QWidget):
 
         except Exception as e:
             Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')
+
 
     def search_in_log(self, text: str, case_sensitive: bool, use_regex: bool, whole_word: bool, start_position: int = 0) -> list:
         """在日志中搜索文本
