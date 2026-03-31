@@ -31,7 +31,7 @@ from ui.device_test.command_manager import ATCommandManager
 from utils.constants import (
     get_button_style, get_group_style, get_text_edit_style, get_page_button_style
 )
-from core.tester import TestResultAnalyzer
+#from core.tester import TestResultAnalyzer
 
 class TestCase:
     """测试用例类"""

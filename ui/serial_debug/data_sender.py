@@ -182,7 +182,7 @@ class DataSender(QObject):
             # 使用纯文本格式，不使用HTML标签
             display_data = f'[{timestamp}]发送→◇{display_data}'
 
-        # 使用QPlainTextEdit的方式添加文本 - 修改这里
+        # 使用QPlainTextEdit的方式添加文本
         cursor = self.recv_text.textCursor()
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(display_data + '\n')

@@ -19,7 +19,7 @@ from utils.constants import (
     get_page_radio_button_style
 )
 
-from ui.serial_debug.data_sender import DataSender
+from core.serial_controller import SerialController
 
 class CommandEdit(QLineEdit):
     """自定义命令编辑框，支持双击编辑提示文本"""
@@ -169,28 +169,38 @@ class CommandManager(QObject):
         self.commands_container = None
         self.commands_layout = None
 
-        # 数据发送器
-        self.data_sender = None
+        self.serial_controller = None
 
-        # 串口管理器
-        self.serial_manager = None
+        # 添加配置选项的引用
+        self.hex_send_check = None
+        self.add_crlf_check = None
 
         # 初始化定时器
         self.loop_timer = QTimer(self)
         self.loop_timer.timeout.connect(self._send_next_command)
 
-    def set_serial_manager(self, manager) -> None:
-        """设置串口管理器"""
-        self.serial_manager = manager
+    def set_config_options(self, hex_send_check, add_crlf_check):
+        """设置配置选项的引用
+
+        Args:
+            hex_send_check: 十六进制发送复选框
+            add_crlf_check: 添加回车换行复选框
+        """
+        self.hex_send_check = hex_send_check
+        self.add_crlf_check = add_crlf_check
+
+    def set_serial_controller(self, controller: SerialController) -> None:
+        """设置串口控制器"""
+        self.serial_controller = controller
 
     def set_commands_container(self, container: QWidget, layout: QVBoxLayout) -> None:
         """设置命令容器"""
         self.commands_container = container
         self.commands_layout = layout
 
-    def set_serial_sender(self, sender: DataSender) -> None:
-        """设置数据发送器"""
-        self.data_sender = sender
+    #def set_serial_sender(self, sender: DataSender) -> None:
+    #    """设置数据发送器"""
+    #    self.data_sender = sender
 
     def add_command(self, command_text: str = "", delay: int = 1000) -> None:
         """添加命令（内部调用add_command_row）"""
@@ -472,7 +482,7 @@ class CommandManager(QObject):
             return
 
         # 检查串口连接状态
-        if not self.serial_manager or not self.serial_manager.is_connected:
+        if not self.serial_controller or not self.serial_controller.is_connected:
             self.command_send_failed.emit("串口未连接")
             return
 
@@ -483,8 +493,24 @@ class CommandManager(QObject):
             self.command_send_failed.emit("延时时间格式错误")
             return
 
+        # 安全地获取父对象的配置选项
+        try:
+            if self.hex_send_check is None or self.add_crlf_check is None:
+                self.command_send_failed.emit("配置选项未初始化")
+                Logger.log("配置选项未初始化，请检查初始化顺序", "ERROR")
+                return
+
+            is_hex_send = self.hex_send_check.isChecked() if hasattr(self.hex_send_check, 'isChecked') else False
+            is_add_crlf = self.add_crlf_check.isChecked() if hasattr(self.add_crlf_check, 'isChecked') else True
+        except Exception as e:
+            print("----------------22222-----------------")
+            self.command_send_failed.emit(f"获取配置失败: {str(e)}")
+            Logger.log(f"获取配置失败: {str(e)}", "ERROR")
+            return
+
+
         # 处理十六进制发送
-        if self.data_sender.hex_send:
+        if is_hex_send:
             try:
                 data_bytes = bytes.fromhex(command_text.replace(' ', ''))
             except ValueError:
@@ -495,28 +521,26 @@ class CommandManager(QObject):
             data_bytes = command_text.encode('utf-8')
 
         # 检查是否添加回车换行
-        if self.data_sender.add_crlf:
+        if is_add_crlf:
             print("添加回车换行")
             data_bytes += b'\r\n'
-
-        print("不添加回车换行")
+        else:
+            print("不添加回车换行")
 
         # 发送数据
         try:
-            success = self.serial_manager.send_data(data_bytes)
+            success = self.serial_controller.send_data(data_bytes)
             if success:
                 # 发送命令信号
                 self.command_sent.emit(command_text)
                 Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
-
-                # 显示发送的数据到接收区
-                #self._display_sent_data(command_text, data_bytes)
             else:
                 self.command_send_failed.emit("发送命令失败")
                 Logger.log(f"发送命令失败: {command_text}", "ERROR")
         except Exception as e:
             self.command_send_failed.emit(f"发送命令失败: {str(e)}")
             Logger.log(f"发送命令失败: {str(e)}", "ERROR")
+
 
     def toggle_loop_send(self, checked: bool) -> None:
         """切换循环发送状态"""

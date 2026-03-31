@@ -2,7 +2,7 @@
 GNSS设备标签页组件
 """
 import serial
-from core.serial_controller import SerialReader
+#from core.serial_controller import SerialReader
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QPushButton, QComboBox, QLineEdit, QTextEdit,

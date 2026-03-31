@@ -35,12 +35,12 @@ from ui.serial_debug.serial_debug_event import (
 from controllers.serial_debug.serial_debug_controller import SerialDebugController
 
 # 导入管理器模块
-from ui.serial_debug.serial_port_manager import SerialPortManager
+#from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.data_receiver import DataReceiver
 from ui.serial_debug.data_sender import DataSender
 from ui.serial_debug.command_manager import CommandManager
 from ui.serial_debug.data_display import DataDisplay
-from core.serial_controller import SerialReader
+#from core.serial_controller import SerialReader
 
 
 class SerialDebugPage(QWidget):
@@ -128,6 +128,11 @@ class SerialDebugPage(QWidget):
 
         # 创建设备标签页
         device_tab = SerialDebugTab(port_name, parent=self)
+
+        # 连接状态变化信号（如果存在）
+        if hasattr(device_tab, 'connection_changed'):
+            device_tab.connection_changed.connect(lambda: self.update_status())
+
         tab_index = self.tab_widget.addTab(device_tab, f"{port_name}")
         self.device_tabs[port_name] = (device_tab, tab_index)
         self.device_count += 1
@@ -231,10 +236,15 @@ class SerialDebugPage(QWidget):
                     serial.PARITY_MARK: 'M',
                     serial.PARITY_SPACE: 'S'
                 }
-                parity_char = parity_map.get(tab.parity, 'N')
-                rtscts_text = "RTS/CTS" if tab.rtscts else "N"
+                parity = getattr(tab, 'parity', 'None')
+                parity_char = parity_map.get(parity, 'N')
+                rtscts_text = "RTS/CTS" if getattr(tab, 'rtscts', False) else "N"
 
-                device_info = f"{port}: {tab.baudrate},{tab.databits},{tab.stopbits},{parity_char},{rtscts_text}"
+                baudrate = getattr(tab, 'baudrate', 115200)
+                databits = getattr(tab, 'databits', 8)
+                stopbits = getattr(tab, 'stopbits', 1)
+
+                device_info = f"{port}: {baudrate},{databits},{stopbits},{parity_char},{rtscts_text}"
                 status_messages.append(device_info)
                 Logger.log(f"端口 {port} 已连接", "DEBUG")
             else:

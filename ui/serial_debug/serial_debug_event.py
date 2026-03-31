@@ -7,9 +7,10 @@ from PyQt5.QtGui import QTextCursor
 from datetime import datetime
 from ui.dialogs import CustomMessageBox, SerialConfigDialog, FileSendDialog
 from utils.logger import Logger
+from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
 import serial
 from PyQt5.QtWidgets import (
-    QDialog
+    QDialog, QMessageBox
 )
 
 from utils.constants import (
@@ -65,16 +66,15 @@ class SerialDebugTabEvents:
 
     def on_hex_display_changed(self, state):
         """十六进制显示改变"""
-        self.tab.data_receiver.hex_display = (state == Qt.Checked)
+        self.tab.hex_display = (state == Qt.Checked)
 
     def on_auto_scroll_changed(self, state):
         """自动滚动改变"""
-        self.tab.data_receiver.auto_scroll = (state == Qt.Checked)
+        self.tab.auto_scroll = (state == Qt.Checked)
 
     def on_timestamp_changed(self, state):
         """时间戳显示改变"""
-        self.tab.data_receiver.show_timestamp = (state == Qt.Checked)
-        self.tab.data_sender.show_timestamp = (state == Qt.Checked)
+        self.tab.show_timestamp = (state == Qt.Checked)
 
     def on_pause_recv_changed(self, state):
         """暂停接收改变"""
@@ -100,9 +100,9 @@ class SerialDebugTabEvents:
 
     def on_clear_recv(self):
         """清除接收数据"""
-        self.tab.data_receiver.clear_data()
-        self.tab.serial_manager.total_send_bytes = 0
-        self.tab.serial_manager.total_recv_bytes = 0
+        # 直接清空接收文本框
+        self.tab.recv_text.clear()
+        # 清除统计
         self.tab._clear_stats()
 
     def on_show_serial_config(self):
@@ -164,16 +164,37 @@ class SerialDebugTabEvents:
     def on_toggle_connection(self):
         """切换连接状态"""
         if self.tab.is_connected:
-            self.tab.serial_manager.disconnect()
+            # 断开连接
+            self.tab.serial_controller.disconnect_port()
         else:
-            self.tab.serial_manager.connect(
-                self.tab.port_name,
-                self.tab.baudrate,
-                self.tab.databits,
-                self.tab.stopbits,
-                self.tab.parity,
-                self.tab.rtscts
+            # 连接串口
+            port_name = self.tab.port_name
+            baudrate = self.tab.baudrate
+            databits = self.tab.databits
+            stopbits = self.tab.stopbits
+            parity = self.tab.parity
+            rtscts = self.tab.rtscts
+
+            # 转换parity参数
+            parity_map = {
+                'None': QSerialPort.NoParity,
+                'Even': QSerialPort.EvenParity,
+                'Odd': QSerialPort.OddParity,
+                'Mark': QSerialPort.MarkParity,
+                'Space': QSerialPort.SpaceParity
+            }
+
+            success = self.tab.serial_controller.connect_port(
+                port_name=port_name,
+                baudrate=baudrate,
+                databits=databits,
+                stopbits=stopbits,
+                parity=parity_map.get(parity, QSerialPort.NoParity),
+                rtscts=rtscts
             )
+
+            if not success:
+                QMessageBox.warning(self.tab, "连接失败", "无法连接到串口")
 
     def on_toggle_commands_panel(self):
         """切换扩展命令面板"""
@@ -263,7 +284,7 @@ class SerialDebugTabEvents:
             data_bytes += b'\r\n'
 
         # 发送数据
-        success = self.tab.serial_manager.send_data(data_bytes)
+        success = self.tab.serial_controller.send_data(data_bytes)
         # 显示发送的数据到接收区
         self._display_sent_data(data, data_bytes)
         if success:
@@ -279,14 +300,14 @@ class SerialDebugTabEvents:
             data: 原始文本数据
             data_bytes: 转换后的字节数据
         """
-        if not self.tab.data_receiver.recv_text:
+        if not hasattr(self.tab, 'recv_text') or not self.tab.recv_text:
             print("显示发送数据时接收区不存在")
             return
 
         try:
             # 格式化发送数据（添加发送标识）
             display_data = data
-            if self.tab.data_sender.show_timestamp:
+            if hasattr(self.tab, 'timestamp_recv_check') and self.tab.timestamp_recv_check.isChecked():
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
                 display_data = f'[{timestamp}]发送→◇{display_data}'
 
@@ -294,24 +315,24 @@ class SerialDebugTabEvents:
             if self.tab.hex_send_check.isChecked():
                 display_data = data_bytes.hex(' ').upper()
 
-            # 使用QPlainTextEdit的方式添加文本
-            cursor = self.tab.data_receiver.recv_text.textCursor()
+            # 显示文本
+            cursor = self.tab.recv_text.textCursor()
             cursor.movePosition(QTextCursor.End)
             cursor.insertText(display_data + '\n')
-            self.tab.data_receiver.recv_text.setTextCursor(cursor)
+            self.tab.recv_text.setTextCursor(cursor)
 
             # 自动滚动
-            if self.tab.data_receiver.auto_scroll:
-                cursor = self.tab.data_receiver.recv_text.textCursor()
+            if hasattr(self.tab, 'auto_scroll_check') and self.tab.auto_scroll_check.isChecked():
+                cursor = self.tab.recv_text.textCursor()
                 cursor.movePosition(QTextCursor.End)
-                self.tab.data_receiver.recv_text.setTextCursor(cursor)
+                self.tab.recv_text.setTextCursor(cursor)
 
         except Exception as e:
             Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')
 
     def on_clear_send(self):
         """清空发送数据"""
-        self.tab.data_sender.clear_data()
+        self.tab.send_edit.clear()
 
     def on_toggle_timer_send(self, checked):
         """切换定时发送"""

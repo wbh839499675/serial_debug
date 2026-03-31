@@ -33,8 +33,6 @@ from core.relay_controller import RelayController, RelayMonitorThread
 #from core.power_analyzer_controller import PowerAnalyzerController, PowerAnalyzerMonitorThread
 from core.mpa_controller import MpaController
 from core.device_monitor import DeviceMonitor
-from core.tester import SerialTester
-
 from ui.serial_debug.serial_debug_page import SerialDebugPage
 from ui.camera_debug.camera_debug_page import CameraDebugPage
 from ui.device_test.device_test_page import DeviceTestPage
@@ -56,7 +54,7 @@ ENABLE_SERIAL_DEBUG_PAGE    = True      # 启用串口调试页面
 ENABLE_CAMERA_PAGE          = True      # 启用Camera调试页面
 ENABLE_GNSS_PAGE            = False      # 启用GNSS测试页面
 ENABLE_DEVICE_TEST_PAGE     = False      # 启用设备测试页面
-ENABLE_POWER_ANALYSIS_PAGE  = True      # 启用功耗分析页面
+ENABLE_POWER_ANALYSIS_PAGE  = False      # 启用功耗分析页面
 ENABLE_OSCILLOSCOPE_PAGE    = False      # 启用虚拟示波器页面
 ENABLE_FEEDBACK_PAGE        = True      # 启用反馈页面
 

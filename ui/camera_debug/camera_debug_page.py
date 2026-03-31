@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
-from core.serial_controller import SerialController, SerialReader
+#from core.serial_controller import SerialController, SerialReader
 from utils.logger import Logger
 from utils.constants import get_page_button_style
 from utils.constants import get_group_style

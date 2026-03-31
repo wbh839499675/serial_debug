@@ -1,14 +1,16 @@
 from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QListWidgetItem, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
-    QPushButton, QCheckBox, QLineEdit, QPlainTextEdit, QSplitter, QDialog, QSizePolicy
+    QPushButton, QCheckBox, QLineEdit, QPlainTextEdit, QSplitter, QDialog,
+    QSizePolicy, QMessageBox
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal, QSize
 from PyQt5.QtGui import (
     QPainter, QColor, QTextFormat, QFont, QTextCursor, QTextCharFormat
 )
 
-from ui.serial_debug.serial_port_manager import SerialPortManager
+from core.serial_controller import SerialController
+#from ui.serial_debug.serial_port_manager import SerialPortManager
 from ui.serial_debug.serial_debug_layout import SerialDebugTabLayout
 from ui.serial_debug.serial_debug_event import SerialDebugTabEvents
 from ui.serial_debug.data_receiver import DataReceiver
@@ -32,6 +34,7 @@ class SerialDebugTab(QWidget):
     data_received = pyqtSignal(str)
     send_bytes_updated = pyqtSignal(int)
     recv_bytes_updated = pyqtSignal(int)
+    connection_changed = pyqtSignal(bool)
 
     def __init__(self, port_name=None, parent=None):
         super().__init__(parent)
@@ -46,20 +49,18 @@ class SerialDebugTab(QWidget):
         self.parity = 'None'        # 校验位
         self.rtscts = False         # 硬件流控
 
-        # 初始化串口管理器
-        self.serial_manager = SerialPortManager(self)
-
-        # 初始化统计管理器
-        #self.statistics_manager = StatisticsManager(self)
+        # 使用统一的串口控制器
+        self.serial_controller = SerialController()
 
         # 先初始化事件处理器
         self.events = SerialDebugTabEvents(self)
-
-        # 初始化其他组件
-        self._init_components()
+        self.command_manager = CommandManager(parent=self)
+        self.command_manager.set_serial_controller(self.serial_controller)
 
         # 始化UI
         self._init_ui()
+
+        self.command_manager.set_config_options(self.hex_send_check, self.add_crlf_check)
 
         # 连接信号
         self._connect_signals()
@@ -89,106 +90,124 @@ class SerialDebugTab(QWidget):
 
     def _connect_signals(self):
         """连接各个管理器的信号"""
-        self.serial_manager.connected.connect(self._on_connected)
-        self.serial_manager.disconnected.connect(self._on_disconnected)
-        self.serial_manager.connection_failed.connect(self._on_connection_failed)
-        self.serial_manager.send_bytes_updated.connect(self._on_send_stats_updated)
-        self.serial_manager.recv_bytes_updated.connect(self._on_recv_stats_updated)
+        self.serial_controller.data_received.connect(self._on_data_received)
+        self.serial_controller.connection_changed.connect(self._on_connection_changed)
+        self.serial_controller.error_occurred.connect(self._on_error)
 
-        # 关键修改：直接连接串口管理器的数据接收信号到数据接收器
-        self.serial_manager.data_received.connect(self.data_receiver.process_data)
+    def connect(self, **kwargs) -> bool:
+        """连接串口
 
-        # 可选：如果需要处理原始数据，可以保留这个连接
-        #self.serial_manager.data_received.connect(self._on_data_received)
+        Args:
+            **kwargs: 串口参数，包括:
+                - port_name: 串口名称
+                - baudrate: 波特率
+                - databits: 数据位
+                - stopbits: 停止位
+                - parity: 校验位
+                - rtscts: 硬件流控
 
-    def _init_components(self):
-        """初始化功能组件"""
-        self.data_receiver = DataReceiver(self)
-        self.data_sender = DataSender(self)
-        self.command_manager = CommandManager(self)
-        #self.statistics = StatisticsManager(self)
+        Returns:
+            bool: 连接是否成功
+        """
+        # 使用当前配置或传入参数
+        port_name = kwargs.get('port_name', self.port_name)
+        baudrate = kwargs.get('baudrate', self.baudrate)
+        databits = kwargs.get('databits', self.databits)
+        stopbits = kwargs.get('stopbits', self.stopbits)
+        parity = kwargs.get('parity', self.parity)
+        rtscts = kwargs.get('rtscts', self.rtscts)
 
+        # 转换parity参数
+        parity_map = {
+            'None': QSerialPort.NoParity,
+            'Even': QSerialPort.EvenParity,
+            'Odd': QSerialPort.OddParity,
+            'Mark': QSerialPort.MarkParity,
+            'Space': QSerialPort.SpaceParity
+        }
+
+        # 调用串口控制器连接
+        success = self.serial_controller.connect_port(
+            port_name=port_name,
+            baudrate=baudrate,
+            databits=databits,
+            stopbits=stopbits,
+            parity=parity_map.get(parity, QSerialPort.NoParity),
+            rtscts=rtscts
+        )
+
+        if success:
+            self.is_connected = True
+            self._on_connection_changed(True)
+            Logger.log(f"串口 {port_name} 连接成功", "SUCCESS")
+        else:
+            Logger.log(f"串口 {port_name} 连接失败", "ERROR")
+
+        return success
+
+    def disconnect(self) -> bool:
+        """断开串口连接
+
+        Returns:
+            bool: 断开是否成功
+        """
+        success = self.serial_controller.disconnect_port()
+
+        if success:
+            self.is_connected = False
+            self._on_connection_changed(False)
+            Logger.log(f"串口 {self.port_name} 已断开", "INFO")
+        else:
+            Logger.log(f"串口 {self.port_name} 断开失败", "ERROR")
+
+        return success
+
+    #def _init_components(self):
+    #    """初始化功能组件"""
+        #self.command_manager = CommandManager(parent=self)
         # 设置命令管理器的数据发送器
-        self.command_manager.set_serial_sender(self.data_sender)
+        #self.command_manager.set_serial_controller(self.serial_controller)
+        # 设置配置选项的引用
+        #self.command_manager.set_config_options(self.hex_send_check, self.add_crlf_check)
 
-        # 连接发送数据信号到接收显示
-        self.data_sender.data_sent.connect(self._on_data_sent)
+    def _on_connection_changed(self, connected: bool):
+        """处理连接状态改变"""
+        self.is_connected = connected
+        if connected:
+            self.connect_btn.setText("⛓ 断开连接")
+            self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'disconnect'))
+            self.send_btn.setEnabled(True)
+            self.send_file_btn.setEnabled(True)
+            # 启用扩展命令面板中的发送按钮
+            for i in range(self.commands_layout.count() - 1):
+                widget = self.commands_layout.itemAt(i).widget()
+                if widget:
+                    send_btn = widget.findChild(QPushButton, "send_btn")
+                    if send_btn:
+                        send_btn.setEnabled(True)
+        else:
+            self.connect_btn.setText("⛓ 连接串口")
+            self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'connect'))
+            self.send_btn.setEnabled(False)
+            self.send_file_btn.setEnabled(False)
+            # 禁用扩展命令面板中的发送按钮
+            for i in range(self.commands_layout.count() - 1):
+                widget = self.commands_layout.itemAt(i).widget()
+                if widget:
+                    send_btn = widget.findChild(QPushButton, "send_btn")
+                    if send_btn:
+                        send_btn.setEnabled(False)
 
-        # 设置串口管理器
-        self.data_sender.set_serial_manager(self.serial_manager)
+        # 发送连接状态变化信号
+        self.connection_changed.emit(connected)
 
-        # 设置命令管理器的串口管理器
-        self.command_manager.set_serial_manager(self.serial_manager)
-
-    def _on_connected(self, port_name: str):
-        """连接成功处理"""
-        Logger.log(f"已连接至串口：{port_name}", "INFO")
-
-        # 验证串口对象
-        if not self.serial_manager.serial_port:
-            Logger.log("串口对象为空", "ERROR")
+    def _on_error(self, error_msg: str):
+        """处理错误"""
+        if "No error" in error_msg:
             return
 
-        # 验证串口状态
-        if not self.serial_manager.serial_port.isOpen():
-            Logger.log(f"串口 {port_name} 未正确打开", "ERROR")
-            return
-
-        self.is_connected = True
-        self.connect_btn.setText("⛓ 断开连接")
-        self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'disconnect'))
-        Logger.log(f"串口 {port_name} 已打开", "SUCCESS")
-
-        # 通知父页面更新状态
-        print("打开串口,开始更新状态栏...")
-        if self.parent and hasattr(self.parent, 'update_status'):
-            print("打开串口,开始更新状态栏")
-            self.parent.update_status()
-
-        # 启用发送和接收
-        print("启用发送按钮")
-        self.send_btn.setEnabled(True)
-        self.send_file_btn.setEnabled(True)
-
-        # 启用扩展命令面板中的发送按钮
-        for i in range(self.commands_layout.count() - 1):
-            widget = self.commands_layout.itemAt(i).widget()
-            if widget:
-                send_btn = widget.findChild(QPushButton, "send_btn")
-                if send_btn:
-                    send_btn.setEnabled(True)
-
-        # 设置数据接收器的波特率
-        self.data_receiver.set_baudrate(self.baudrate)
-
-        # 在连接成功后设置串口对象
-        self.data_receiver.set_serial_port(self.serial_manager.serial_port)
-
-    def _on_disconnected(self, port_name: str):
-        """断开连接处理"""
-        Logger.log(f"处理断开连接: {port_name}", "DEBUG")
-
-        # 先更新连接状态
-        self.is_connected = False
-
-        # 更新UI
-        self.connect_btn.setText("🔗 连接串口")
-        self.connect_btn.setStyleSheet(get_page_button_style('serial_debug', 'connect'))
-
-        # 通知父页面更新状态
-        if self.parent and hasattr(self.parent, 'update_status'):
-            print("关闭串口,开始更新状态栏")
-            self.parent.update_status()
-
-        # 禁用发送和接收
-        self.send_btn.setEnabled(False)
-        self.send_file_btn.setEnabled(False)
-
-        Logger.log(f"断开连接处理完成: {port_name}", "DEBUG")
-
-    def _on_connection_failed(self, port_name: str, error_msg: str):
-        """连接失败处理"""
-        CustomMessageBox("错误", f"连接串口 {port_name} 失败: {error_msg}", "error", self).exec_()
+        Logger.log(error_msg, "ERROR")
+        QMessageBox.warning(self, "串口错误", error_msg)
 
     def _on_port_removed(self, port_name: str):
         """串口移除处理"""
@@ -296,9 +315,6 @@ class SerialDebugTab(QWidget):
         recv_text_layout.addWidget(self.recv_text, 1)
         recv_layout.addWidget(recv_text_container)
 
-        # 关键修改：设置数据接收器的文本框
-        self.data_receiver.set_recv_text(self.recv_text)
-
         # 创建统计标签
         stats_widget = QWidget()
         stats_layout = QHBoxLayout(stats_widget)
@@ -387,13 +403,6 @@ class SerialDebugTab(QWidget):
         send_input_layout.addLayout(send_buttons_layout)
         send_layout.addWidget(send_input_widget)
 
-        # 添加以下代码：设置发送文本框到数据发送器,解决定时发送时未设置send_edit的问题
-        if hasattr(self, 'data_sender') and self.data_sender:
-            self.data_sender.set_send_edit(self.send_edit)
-            print(f"发送文本框已设置到数据发送器: {self.send_edit}")
-        else:
-            print("警告：数据发送器未创建，无法设置发送文本框")
-
         return send_group
 
     def _create_commands_panel(self):
@@ -461,7 +470,6 @@ class SerialDebugTab(QWidget):
         # 设置命令管理器的容器和布局
         self.command_manager.set_commands_container(commands_container, self.commands_layout)
         self.command_manager.set_commands_panel(commands_panel)
-        self.command_manager.set_serial_sender(self.data_sender)
 
         return commands_panel
 
@@ -478,8 +486,26 @@ class SerialDebugTab(QWidget):
             else:
                 data_str = str(data)
 
-            # 仅发射数据接收信号，不重复处理
-            self.data_received.emit(data_str)
+            # 格式化显示
+            display_data = data_str
+            if hasattr(self, 'timestamp_recv_check') and self.timestamp_recv_check.isChecked():
+                timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                display_data = f'[{timestamp}]接收→◇{display_data}'
+
+            # 添加到接收区
+            cursor = self.recv_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText(display_data + '\n')
+            self.recv_text.setTextCursor(cursor)
+
+            # 自动滚动
+            if hasattr(self, 'auto_scroll_check') and self.auto_scroll_check.isChecked():
+                cursor = self.recv_text.textCursor()
+                cursor.movePosition(QTextCursor.End)
+                self.recv_text.setTextCursor(cursor)
+
+            # 更新统计
+            self._update_recv_stats(len(data))
 
         except Exception as e:
             Logger.error(f"处理接收数据异常: {str(e)}", module='serial_debug')
@@ -494,6 +520,23 @@ class SerialDebugTab(QWidget):
         if self.recv_count_label:
             self.recv_count_label.setText(f"接收字节数: {total_bytes}")
 
+    def _update_recv_stats(self, byte_count: int):
+        """更新接收统计"""
+        if not hasattr(self, 'recv_count_label'):
+            return
+
+        # 获取当前统计值
+        current_text = self.recv_count_label.text()
+        try:
+            current_bytes = int(current_text.split(': ')[1])
+        except (IndexError, ValueError):
+            current_bytes = 0
+
+        # 更新统计
+        total_bytes = current_bytes + byte_count
+        self.recv_count_label.setText(f"接收字节数: {total_bytes}")
+
+
     def _clear_stats(self) -> None:
         """清除统计"""
         self.sent_count_label.setText(f"发送字节数: 0")
@@ -501,41 +544,36 @@ class SerialDebugTab(QWidget):
 
     def _on_data_sent(self, data: bytes):
         """处理发送的数据，显示到接收区"""
-        if not self.data_receiver.recv_text:
+        if not hasattr(self, 'recv_text') or not self.recv_text:
             print("显示发送数据时接收区不存在")
             return
 
         try:
             # 转换数据为字符串
             if isinstance(data, bytes):
-                # 使用 errors='replace' 替换无法解码的字节
                 data_str = data.decode('utf-8', errors='replace')
             elif isinstance(data, str):
-                # 如果已经是字符串，直接使用
                 data_str = data
             else:
-                # 其他类型，转换为字符串
                 data_str = str(data)
 
             # 格式化发送数据（添加发送标识）
             display_data = data_str
-            if self.data_receiver.show_timestamp:
+            if hasattr(self, 'timestamp_recv_check') and self.timestamp_recv_check.isChecked():
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-
                 display_data = f'[{timestamp}]发送→◇{display_data}'
-                print(f'发送数据......: {display_data}')
 
-            # 使用QPlainTextEdit的方式添加文本
-            cursor = self.data_receiver.recv_text.textCursor()
+            # 添加到接收区
+            cursor = self.recv_text.textCursor()
             cursor.movePosition(QTextCursor.End)
             cursor.insertText(display_data + '\n')
-            self.data_receiver.recv_text.setTextCursor(cursor)
+            self.recv_text.setTextCursor(cursor)
 
             # 自动滚动
-            if self.data_receiver.auto_scroll:
-                cursor = self.data_receiver.recv_text.textCursor()
+            if hasattr(self, 'auto_scroll_check') and self.auto_scroll_check.isChecked():
+                cursor = self.recv_text.textCursor()
                 cursor.movePosition(QTextCursor.End)
-                self.data_receiver.recv_text.setTextCursor(cursor)
+                self.recv_text.setTextCursor(cursor)
 
         except Exception as e:
             Logger.error(f"显示发送数据异常: {str(e)}", module='serial_debug')

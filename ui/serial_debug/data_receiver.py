@@ -59,9 +59,25 @@ class DataReceiver(QObject):
 
         # 读取所有可用数据
         data = self.serial_port.readAll()
-        print(f"接收到数据: {data}")
+        data_bytes = data.data()
+
+        print(f"📥 接收数据详情:")
+        print(f"   - 数据长度: {len(data_bytes)} 字节")
+        print(f"   - 原始字节: {data_bytes}")
+        print(f"   - 十六进制: {' '.join(f'{b:02X}' for b in data_bytes)}")
+
+        try:
+            data_str = data_bytes.decode('utf-8', errors='ignore')
+            print(f"   - UTF-8解码: {repr(data_str)}")
+        except Exception as e:
+            print(f"   - 解码失败: {str(e)}")
+
         if data:
-            self.process_data(data.data())
+            self.process_data(data_bytes)
+            print("✅ 数据已传递给process_data处理")
+        else:
+            print("⚠️ 警告: 接收到空数据")
+        print("========================\n")
 
     def _on_frame_timeout(self) -> None:
         """数据帧超时处理，标记为新数据帧"""
@@ -77,7 +93,7 @@ class DataReceiver(QObject):
 
     def process_data(self, data: bytes) -> None:
         """处理接收到的数据"""
-        print(f"process_data 被调用，数据长度: {len(data)}")  # 添加调试日志
+        #print(f"process_data 被调用，数据长度: {len(data)}, 数据内容: {data}")  # 添加调试日志
 
         if not data or self.pause_recv:
             print("数据为空或暂停接收")  # 添加调试日志
@@ -106,11 +122,11 @@ class DataReceiver(QObject):
                 lines = self.receive_buffer.split('\n')
                 # 保留最后一行（可能不完整）
                 self.receive_buffer = lines[-1]
-                print(f"缓冲区分割为 {len(lines)} 行")  # 添加调试日志
+                #print(f"缓冲区分割为 {len(lines)} 行")  # 添加调试日志
 
                 # 处理并显示其他行
                 for i, line in enumerate(lines[:-1]):
-                    print(f"处理第 {i} 行: {line}")  # 添加调试日志
+                    #print(f"处理第 {i} 行: {line}")  # 添加调试日志
 
                     # 空行不添加前缀
                     if i != 0 and not line.strip():
@@ -198,25 +214,3 @@ class DataReceiver(QObject):
         self._is_new_frame = True  # 重置为新数据帧
         self._frame_timer.stop()  # 停止数据帧定时器
         self.stats_updated.emit(self.total_recv_bytes)
-
-    def _stop_read_thread(self) -> None:
-        """停止数据读取线程"""
-        try:
-            # 停止读取器
-            if hasattr(self, 'reader') and self.reader:
-                self.reader.stop()
-                self.reader = None
-
-            # 停止并等待线程结束
-            if hasattr(self, 'read_thread') and self.read_thread:
-                if self.read_thread.isRunning():
-                    self.read_thread.quit()
-                    if not self.read_thread.wait(3000):  # 等待3秒
-                        Logger.log("数据读取线程停止超时，强制终止", "WARNING")
-                        self.read_thread.terminate()
-                        self.read_thread.wait(1000)
-                self.read_thread = None
-
-            Logger.log("数据读取线程已停止", "INFO")
-        except Exception as e:
-            Logger.log(f"停止数据读取线程失败: {str(e)}", "ERROR")

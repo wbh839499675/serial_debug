@@ -238,6 +238,8 @@ PyInstaller.__main__.run([
     '--hidden-import=pyqtgraph',
     '--hidden-import=pyqtgraph.graphicsItems.PlotItem',
     '--hidden-import=pyqtgraph.graphicsItems.ViewBox',
+    '--hidden-import=pyqtgraph.graphicsItems.AxisItem',
+    '--hidden-import=pyqtgraph.graphicsItems.GraphicsItem',
     '--hidden-import=usb.core',
     '--hidden-import=usb.util',
     '--hidden-import=numpy',
@@ -252,6 +254,7 @@ PyInstaller.__main__.run([
     '--exclude-module=numpy.distutils',
     '--exclude-module=numpy.f2py',
     '--exclude-module=numpy.testing',
+    '--exclude-module=pyqtgraph.opengl',
     '--additional-hooks-dir=' + os.path.join(project_root, 'hooks'),
     '--clean',
     '--noconfirm',
@@ -259,6 +262,8 @@ PyInstaller.__main__.run([
     '--collect-all=numpy',  # 收集numpy的所有依赖
     '--collect-all=pyqtgraph',  # 收集pyqtgraph的所有依赖
     '--collect-all=pyusb',  # 收集pyusb的所有依赖
+    '--hidden-import=usb.backend.libusb1',  # 添加这一行
+    '--hidden-import=usb.backend.libusb0',  # 添加这一行
 ])
 
 # 创建安装程序
