@@ -147,7 +147,7 @@ class CommandManager(QObject):
     # 信号定义
     command_added = pyqtSignal(int)  # 命令添加信号，参数为命令索引
     command_removed = pyqtSignal(int)  # 命令移除信号，参数为命令索引
-    command_sent = pyqtSignal(str)  # 命令发送信号，参数为命令内容
+    command_sent = pyqtSignal(bytes)  # 命令发送信号，参数为命令内容
     command_send_failed = pyqtSignal(str)  # 命令发送失败信号，参数为命令内容
     loop_send_started = pyqtSignal(int)  # 循环发送开始信号
     loop_send_stopped = pyqtSignal(int)  # 循环发送停止信号
@@ -530,11 +530,11 @@ class CommandManager(QObject):
             success = self.serial_controller.send_data(data_bytes)
             if success:
                 # 发送命令信号
-                self.command_sent.emit(command_text)
-                Logger.log(f"发送命令: {command_text}, 延时: {delay}ms", "INFO")
+                self.command_sent.emit(data_bytes)
+                Logger.log(f"发送命令: {data_bytes}, 延时: {delay}ms", "INFO")
             else:
                 self.command_send_failed.emit("发送命令失败")
-                Logger.log(f"发送命令失败: {command_text}", "ERROR")
+                Logger.log(f"发送命令失败: {data_bytes}", "ERROR")
         except Exception as e:
             self.command_send_failed.emit(f"发送命令失败: {str(e)}")
             Logger.log(f"发送命令失败: {str(e)}", "ERROR")

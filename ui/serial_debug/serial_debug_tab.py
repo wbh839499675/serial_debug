@@ -92,6 +92,9 @@ class SerialDebugTab(QWidget):
         self.serial_controller.connection_changed.connect(self._on_connection_changed)
         self.serial_controller.error_occurred.connect(self._on_error)
 
+        # 连接命令管理器的数据发送信号
+        self.command_manager.command_sent.connect(self._on_data_sent)
+
     def connect(self, **kwargs) -> bool:
         """连接串口
 
