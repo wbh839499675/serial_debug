@@ -21,6 +21,7 @@ class SerialController(QObject):
         super().__init__(parent)
         self.serial_port = QSerialPort()
         self._is_connected = False
+        self._data_callbacks = []  # 数据回调函数列表
 
         # 串口参数
         self._baudrate = 115200
@@ -59,6 +60,26 @@ class SerialController(QObject):
         """获取硬件流控"""
         return self._rtscts
 
+    def register_data_callback(self, callback):
+        """注册数据接收回调函数
+
+        Args:
+            callback: 回调函数，接收参数为 bytes 类型的数据
+        """
+        if callback not in self._data_callbacks:
+            self._data_callbacks.append(callback)
+            Logger.info(f"已注册数据回调函数: {callback.__name__}", module='serial_controller')
+
+    def unregister_data_callback(self, callback):
+        """注销数据接收回调函数
+
+        Args:
+            callback: 要注销的回调函数
+        """
+        if callback in self._data_callbacks:
+            self._data_callbacks.remove(callback)
+            Logger.info(f"已注销数据回调函数: {callback.__name__}", module='serial_controller')
+
     def _on_data_ready(self):
         """数据就绪处理 - 事件驱动"""
         if not self.serial_port.isOpen():
@@ -67,8 +88,15 @@ class SerialController(QObject):
         try:
             data = self.serial_port.readAll()
             if data:
-                print(f"接收到数据: {data.data().decode('utf-8')}")
+                #print(f"接收到数据: {data.data().decode('utf-8')}")
                 self.data_received.emit(data.data())
+
+                # 调用所有注册的回调函数
+                for callback in self._data_callbacks:
+                    try:
+                        callback(data.data())
+                    except Exception as e:
+                        Logger.error(f"回调函数执行失败 {callback.__name__}: {str(e)}", module='serial_controller')
         except Exception as e:
             Logger.log(f"读取串口数据出错: {str(e)}", "ERROR")
             self.error_occurred.emit(f"读取错误: {str(e)}")
@@ -129,13 +157,20 @@ class SerialController(QObject):
             self.error_occurred.emit(error_msg)
             return False
 
-    def send_data(self, data: bytes) -> bool:
+    def send_data(self, data: Union[bytes, str]) -> bool:
         """发送数据"""
         if not self._is_connected or not self.serial_port.isOpen():
             Logger.log("串口未连接，无法发送数据", "WARNING")
             return False
 
         try:
+            # 类型转换：如果是字符串，转换为bytes
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            elif not isinstance(data, (bytes, bytearray)):
+                Logger.log(f"不支持的数据类型: {type(data)}", "ERROR")
+                return b''
+
             bytes_written = self.serial_port.write(data)
             if bytes_written == len(data):
                 return True

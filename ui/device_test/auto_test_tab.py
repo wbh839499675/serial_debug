@@ -1420,7 +1420,7 @@ class AutoTestTab(QWidget):
 
     def on_log_message(self, message, level):
         """处理日志消息"""
-        timestamp = datetime.now().strftime('%H:%M:%S')
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         # 设置颜色
         if level == "INFO":

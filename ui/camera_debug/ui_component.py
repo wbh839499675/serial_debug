@@ -367,12 +367,6 @@ class CameraUIComponents:
         preview_layout.addWidget(self.parent_page.code_preview_scroll)
         layout.addLayout(preview_layout)
 
-        # 重置缩放按钮
-        #self.reset_zoom_btn = QPushButton("重置缩放")
-        #self.reset_zoom_btn.setStyleSheet(get_button_style('default'))
-        #self.reset_zoom_btn.clicked.connect(self.code_preview_label.reset_zoom)
-        #layout.addWidget(self.reset_zoom_btn)
-
         return group
 
     def create_preview_group(self):
@@ -666,7 +660,7 @@ class CameraUIComponents:
         options_layout.addStretch()
 
         # 清除按钮
-        clear_btn = QPushButton("🗑 清除")
+        clear_btn = QPushButton("🗑清除")
         clear_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f56c6c;

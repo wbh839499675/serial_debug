@@ -1819,6 +1819,11 @@ class AudioTestTab(QWidget):
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
             self.log_signal.emit("串口已连接", "INFO")
 
+            # 注册数据回调
+            if self.serial_controller:
+                self.serial_controller.register_data_callback(self.on_serial_data_received)
+                self.log_signal.emit("已注册串口数据回调", "INFO")
+
             # 自动刷新模块信息
             self.refresh_module_info()
         else:
@@ -1828,6 +1833,11 @@ class AudioTestTab(QWidget):
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
             self.log_signal.emit("串口已断开", "INFO")
 
+            # 注销数据回调
+            if self.serial_controller:
+                self.serial_controller.unregister_data_callback(self.on_serial_data_received)
+                self.log_signal.emit("已注销串口数据回调", "INFO")
+
     def on_serial_disconnected(self, disconnected):
         """串口断开状态变化处理"""
         if disconnected:
@@ -1836,6 +1846,11 @@ class AudioTestTab(QWidget):
             self.module_status_label.setText("模块: 离线")
             self.module_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
             self.log_signal.emit("串口已断开", "INFO")
+
+            # 注销数据回调
+            if self.serial_controller:
+                self.serial_controller.unregister_data_callback(self.on_serial_data_received)
+                self.log_signal.emit("已注销串口数据回调", "INFO")
 
     def initialize_audio(self):
         """初始化音频功能"""
@@ -2347,8 +2362,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送暂停播放命令
-            self.serial_controller.send_data("AT+CAUDPLAY=2\r\n")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write_and_read("AT+CAUDPLAY=2\r\n", 300)
             self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2380,8 +2394,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送恢复播放命令
-            self.serial_controller.send_data("AT+CAUDPLAY=3\r\n")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.send_data("AT+CAUDPLAY=3\r\n", 300)
             self.log_signal.emit("TX: AT+CAUDPLAY=3", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2413,8 +2426,7 @@ class AudioTestTab(QWidget):
             self.serial_controller.clear_buffers()
 
             # 发送停止播放命令
-            self.serial_controller.send_data("AT+CAUDPLAY=0")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.send_data("AT+CAUDPLAY=0", 300)
             self.log_signal.emit("TX: AT+CAUDPLAY=2", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 
@@ -2435,6 +2447,66 @@ class AudioTestTab(QWidget):
             self.log_signal.emit("播放已停止", "INFO")
         except Exception as e:
             self.log_signal.emit(f"停止播放失败: {str(e)}", "ERROR")
+
+    def on_serial_data_received(self, data):
+        """处理串口接收到的数据
+
+        Args:
+            data: 接收到的数据 (bytes)
+        """
+        try:
+            # 解码数据
+            data_str = data.decode('utf-8', errors='ignore')
+
+            # 检查播放状态上报
+            if '+CAUDPLAY:' in data_str:
+                # 解析播放状态
+                match = re.search(r'\+CAUDPLAY:\s*(\d+)', data_str)
+                if match:
+                    status = int(match.group(1))
+                    # 处理播放状态变化
+                    self.handle_playback_status(status)
+
+            # 可以添加其他状态检查...
+
+        except Exception as e:
+            Logger.error(f"处理串口数据失败: {str(e)}", module='audio_test')
+
+    def handle_playback_status(self, status):
+        """处理播放状态变化
+
+        Args:
+            status: 播放状态 (0=播放结束, 1=播放中, 2=已暂停)
+        """
+        if status == 0:
+            # 播放结束
+            self.is_playing = False
+            self.playback_status_label.setText("状态: 空闲")
+            self.playback_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #909399;")
+            self.play_btn.setEnabled(True)
+            self.pause_btn.setEnabled(False)
+            self.resume_btn.setEnabled(False)
+            self.stop_playback_btn.setEnabled(False)
+            self.audio_status_label.setText("当前状态: 空闲")
+            self.audio_status_label.setStyleSheet("font-size: 10pt; color: #909399;")
+
+            # 停止播放定时器
+            self.playing_timer.stop()
+
+            self.log_signal.emit("播放已完成", "INFO")
+        elif status == 1:
+            # 播放中
+            self.playback_status_label.setText("状态: 播放中")
+            self.playback_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #67c23a;")
+            self.audio_status_label.setText("当前状态: 播放中")
+            self.audio_status_label.setStyleSheet("font-size: 10pt; color: #67c23a;")
+        elif status == 2:
+            # 已暂停
+            self.playback_status_label.setText("状态: 已暂停")
+            self.playback_status_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #e6a23c;")
+            self.audio_status_label.setText("当前状态: 已暂停")
+            self.audio_status_label.setStyleSheet("font-size: 10pt; color: #e6a23c;")
+
 
     def update_playback_status(self):
         """更新播放状态"""
@@ -2875,8 +2947,7 @@ class AudioTestTab(QWidget):
 
         try:
             # 发送停止TTS命令
-            self.serial_controller.write("AT+CTTS=0\r\n")
-            response = self.serial_controller.read_response()
+            response = self.serial_controller.write("AT+CTTS=0\r\n", 300)
             self.log_signal.emit("TX: AT+CTTS=0", "TX")
             self.log_signal.emit(f"RX: {response}", "RX")
 

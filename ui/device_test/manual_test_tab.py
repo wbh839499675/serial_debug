@@ -526,7 +526,7 @@ class ManualTestTab(QWidget):
 
         # 发送开机命令
         try:
-            self.serial_controller.write_data("AT+CPWROFF=1,1\r\n")
+            self.serial_controller.send_data("AT+CPWROFF=1,1\r\n")
             Logger.info("已发送开机命令", module='manual_test')
         except Exception as e:
             Logger.error(f"发送开机命令失败: {str(e)}", module='manual_test')
@@ -540,7 +540,7 @@ class ManualTestTab(QWidget):
 
         # 发送关机命令
         try:
-            self.serial_controller.write_data("AT+CPWROFF\r\n")
+            self.serial_controller.send_data("AT+CPWROFF\r\n")
             Logger.info("已发送关机命令", module='manual_test')
         except Exception as e:
             Logger.error(f"发送关机命令失败: {str(e)}", module='manual_test')
@@ -572,7 +572,7 @@ class ManualTestTab(QWidget):
 
         if reply == QDialogButtonBox.Yes:
             try:
-                self.serial_controller.write_data("AT+RESET\r\n")
+                self.serial_controller.send_data("AT+RESET\r\n")
                 Logger.info("已发送复位命令", module='manual_test')
                 CustomMessageBox("成功", "设备复位命令已发送", "info", self).exec_()
             except Exception as e:
@@ -600,10 +600,10 @@ class ManualTestTab(QWidget):
         #self.serial_controller.data_received.connect(self._on_command_response)
 
         # 发送命令
-        self.serial_controller.write_data(f"{command}\r\n")
+        self.serial_controller.send_data(f"{command}\r\n")
 
         # 显示发送命令
-        timestamp = datetime.now().strftime('%H:%M:%S')
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
         cursor = self.response_text.textCursor()
         cursor.movePosition(QTextCursor.End)
 
@@ -647,7 +647,7 @@ class ManualTestTab(QWidget):
             response: 接收的响应数据（str类型）
         """
         # 添加时间戳
-        timestamp = datetime.now().strftime('%H:%M:%S')
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         # 添加到响应文本框
         cursor = self.response_text.textCursor()
@@ -657,7 +657,7 @@ class ManualTestTab(QWidget):
             # 语法高亮模式
             # 显示发送命令
             if command:
-                send_html = f"<span style='color: #409eff; font-weight: bold;'>[{timestamp}] 发送: {command}</span><br>"
+                send_html = f"<span style='color: #409eff; font-weight: normal; font-size: 9pt; font-family: SimSun, 宋体, serif;'>[{timestamp}] 发送: {command}</span><br>"
                 cursor.insertHtml(send_html)
 
             # 显示接收响应
@@ -675,10 +675,10 @@ class ManualTestTab(QWidget):
 
                 # 将换行符转换为HTML换行标签
                 response_html = response_display.replace('\n', '<br>')
-                recv_html = f"<span style='color: {status_color}; font-weight: bold;'>[{timestamp}] 接收: {response_html}</span><br>"
+                recv_html = f"<span style='color: {status_color}; font-weight: normal; font-size: 9pt; font-family: SimSun, 宋体, serif;'>[{timestamp}] 接收: {response_html}</span><br>"
                 cursor.insertHtml(recv_html)
             else:
-                recv_html = f"<span style='color: #909399; font-weight: bold;'>[{timestamp}] 接收: 无响应</span><br>"
+                recv_html = f"<span style='color: #909399; font-weight: normal; font-size: 9pt; font-family: SimSun, 宋体, serif;'>[{timestamp}] 接收: 无响应</span><br>"
                 cursor.insertHtml(recv_html)
         else:
             # 非语法高亮模式

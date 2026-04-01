@@ -60,10 +60,27 @@
       ["AT+MAGPS=0", "禁用AGPS"]
     ],
     "音频命令集": [
-      ["AT+QAUDCH", "查询音频通道"],
-      ["AT+QAUDMOD", "查询音频模式"],
-      ["AT+QAUDPLAY", "播放音频"],
-      ["AT+QAUDREC", "录音"]
+      ["AT+CLVL", "扬声器音量等级"],
+      ["AT+CAUDSW=?", "选择CODEC,测试命令"],
+      ["AT+CAUDSW?", "选择CODEC,查询命令"],
+      ["AT+CAUDSW=0", "选择内部CODEC"],
+      ["AT+CAUDSW=1", "选择外部CODEC"],
+      ["AT+CAUDREC=?", "录制音频文件,测试命令"],
+      ["AT+CAUDREC?", "查询录音状态"],
+      ["AT+CAUDREC=1,\"rec.pcm\",1,3000", "录制音频文件"],
+      ["AT+CAUDREC=2", "停止录音"],
+      ["AT+CAUDREC=3", "暂停录音"],
+      ["AT+CAUDREC=4", "恢复录音"],
+      ["AT+CAUDPLAY=?", "播放音频文件,测试命令"],
+      ["AT+CAUDPLAY?", "查询播放状态"],
+      ["AT+CAUDPLAY=1,\"rec.pcm\"", "播放音频文件，单次播放"],
+      ["AT+CAUDPLAY=1,\"rec.pcm\",1", "播放音频文件，重复播放"],
+      ["AT+CAUDPLAY=2", "停止播放"],
+      ["AT+CAUDPLAY=3", "暂停播放"],
+      ["AT+CAUDPLAY=4", "恢复播放"],
+      ["AT+LDTMF=?", "播放本地DTMF,测试命令"],
+      ["AT+LDTMF?", "查询本地DTMF状态"],
+      ["AT+LDTMF=100,\"1234\"", "播放本地DTMF"]
     ],
     "文件操作命令集": [
       ["AT+QFLST", "列出文件"],
